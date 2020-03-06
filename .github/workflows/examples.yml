@@ -30,7 +30,7 @@ jobs:
         fi
     - name: Run examples
       run: |
-        for file in `find examples -name '*.py' -not -name '*_distributed.py' | grep -vE "$IGNORES"`
+        for file in `find examples -name '*.py' -not -name '*_distributed.py' | grep -vE $IGNORES`
         do
           echo $file
         done
