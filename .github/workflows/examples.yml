@@ -36,7 +36,6 @@ jobs:
         done
       env:
         OMP_NUM_THREADS: 1
-        IGNORES: chainermn_.*
     - name: Run multi-node examples
       run: |
         STORAGE_URL=sqlite:///example.db
