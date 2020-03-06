@@ -21,9 +21,9 @@ jobs:
         python -m pip install --upgrade pip
     - name: Set ignores
       run: |
-        if [ ${{ matrix.python-version }} -eq 3.5 ]; then
+        if [ ${{ matrix.python-version }} = 3.5 ]; then
           export IGNORES='chainermn_.*|pytorch_lightning.*|fastai_.*'
-        elif [ ${{ matrix.python-version }} -eq 3.8 ]; then
+        elif [ ${{ matrix.python-version }} = 3.8 ]; then
           export IGNORES='chainermn_.*|dask_ml_.*|keras_.*|pytorch_lightning_.*|tensorflow_.*|tfkeras_.*|fastai_.*'
         else
           export IGNORES='chainermn_.*'
