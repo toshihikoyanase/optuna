@@ -32,9 +32,11 @@ jobs:
 
         for file in `find examples -name '*.py' -not -name '*_distributed.py' | grep -vE "$IGNORES"`
         do
-          python $file
+          echo $file
+          python $file > /dev/null
           if grep -e '\-\-pruning' $file > /dev/null; then
-            python $file --pruning
+            echo $file --pruning
+            python $file --pruning > /dev/null
           fi
         done
       env:
@@ -44,8 +46,9 @@ jobs:
         STORAGE_URL=sqlite:///example.db
         for file in `find examples -name 'chainermn_*.py'`
         do
+          echo $file
           STUDY_NAME=`optuna create-study --storage $STORAGE_URL`
-          mpirun -n 2 -- python $file $STUDY_NAME $STORAGE_URL
+          mpirun -n 2 -- python $file $STUDY_NAME $STORAGE_URL > /dev/null
         done
       env:
         OMP_NUM_THREADS: 1
