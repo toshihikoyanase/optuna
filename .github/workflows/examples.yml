@@ -22,9 +22,9 @@ jobs:
     - name: Run examples
       run: |
         IGNORES='chainermn_.*'
-        if [ $PYTHON_VERSION = 3.5 ]; then
+        if [ ${{ matrix.python-version }} = 3.5 ]; then
           IGNORES='chainermn_.*|pytorch_lightning.*|fastai_.*'
-        elif [ $PYTHON_VERSION = 3.8 ]; then
+        elif [ ${{ matrix.python-version }} = 3.8 ]; then
           IGNORES='chainermn_.*|dask_ml_.*|keras_.*|pytorch_lightning_.*|tensorflow_.*|tfkeras_.*|fastai_.*'
         fi
         echo $IGNORES
@@ -35,7 +35,6 @@ jobs:
         done
       env:
         OMP_NUM_THREADS: 1
-        PYTHON_VERSION: ${{ matrix.python-version }}
     - name: Run multi-node examples
       run: |
         STORAGE_URL=sqlite:///example.db
