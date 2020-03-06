@@ -1,0 +1,44 @@
+name: examples
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: setup-python${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: install
+      run: |
+        python -m pip install --upgrade pip
+        pip install --progress-bar off .[doctest,document,example]
+    - name: examples
+      run: |
+        for file in `find examples -name '*.py' -not -name '*_distributed.py' | grep -vE "$IGNORES"`
+        do
+          python $file
+          if grep -e '\-\-pruning' $file > /dev/null; then
+            python $file --pruning
+          fi
+        done
+      env:
+        OMP_NUM_THREADS: 1
+        IGNORES: chainermn_.*
+    - name: examples-mn
+      run: |
+        STORAGE_URL=sqlite:///example.db
+        for file in `find examples -name 'chainermn_*.py'`
+        do
+          STUDY_NAME=`optuna create-study --storage $STORAGE_URL`
+          mpirun -n 2 -- python $file $STUDY_NAME $STORAGE_URL
+        done
+      env:
+        OMP_NUM_THREADS: 1
