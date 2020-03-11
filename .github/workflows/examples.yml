@@ -29,8 +29,7 @@ jobs:
         python -c 'import optuna'
 
         # Install all dependencies needed for examples.
-        pip install --progress-bar off $(ls dist/*.tar.gz)[testing,doctest,document,example]
-
+        pip install --progress-bar off $(ls dist/*.tar.gz)[testing,example]
     - name: Run examples
       run: |
         if [ ${{ matrix.python-version }} = 3.5 ]; then
