@@ -19,7 +19,16 @@ jobs:
     - name: Install
       run: |
         python -m pip install --upgrade pip
-        pip install --progress-bar off .[doctest,document,example]
+        pip install --progress-bar off -U setuptools
+        python setup.py sdist
+
+        # Install minimal dependencies and confirm that `import optuna` is successful.
+        pip install --progress-bar off $(ls dist/*.tar.gz)
+        python -c 'import optuna'
+
+        # Install all dependencies needed for examples.
+        pip install --progress-bar off $(ls dist/*.tar.gz)[testing,doctest,document,example]
+
     - name: Run examples
       run: |
         if [ ${{ matrix.python-version }} = 3.5 ]; then
