@@ -516,7 +516,7 @@ class LightGBMTuner(BaseTuner):
     def _parse_args(self, *args, **kwargs):
         # type: (Any, Any) -> None
 
-        self.auto_options = {
+        self._options = {
             option_name: kwargs.get(option_name)
             for option_name in [
                 "time_budget",
@@ -528,7 +528,7 @@ class LightGBMTuner(BaseTuner):
         }
 
         # Split options.
-        for option_name in self.auto_options.keys():
+        for option_name in self._options.keys():
             if option_name in kwargs:
                 del kwargs[option_name]
 
@@ -540,7 +540,7 @@ class LightGBMTuner(BaseTuner):
     def run(self) -> None:
         """Perform the hyperparameter-tuning with given parameters."""
         # Surpress log messages.
-        if self.auto_options["verbosity"] == 0:
+        if self._options["verbosity"] == 0:
             optuna.logging.disable_default_handler()
             self.lgbm_params["verbose"] = -1
             self.lgbm_params["seed"] = 111
@@ -553,7 +553,7 @@ class LightGBMTuner(BaseTuner):
         self.sample_train_set()
 
         # Tuning.
-        time_budget = self.auto_options["time_budget"]
+        time_budget = self._options["time_budget"]
 
         self.start_time = time.time()
         with _timer() as t:
@@ -585,14 +585,14 @@ class LightGBMTuner(BaseTuner):
         # type: () -> None
         """Make subset of `self.train_set` Dataset object."""
 
-        if self.auto_options["sample_size"] is None:
+        if self._options["sample_size"] is None:
             return
 
         self.train_set.construct()
         n_train_instance = self.train_set.get_label().shape[0]
-        if n_train_instance > self.auto_options["sample_size"]:
-            offset = n_train_instance - self.auto_options["sample_size"]
-            idx_list = offset + np.arange(self.auto_options["sample_size"])
+        if n_train_instance > self._options["sample_size"]:
+            offset = n_train_instance - self._options["sample_size"]
+            idx_list = offset + np.arange(self._options["sample_size"])
             self.train_subset = self.train_set.subset(idx_list)
 
     def tune_feature_fraction(self, n_trials=7):

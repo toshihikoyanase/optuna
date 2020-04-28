@@ -335,7 +335,7 @@ class TestLightGBMTuner(object):
 
         runner = self._get_tuner_object()
         assert "num_boost_round" in runner.lgbm_kwargs
-        assert "num_boost_round" not in runner.auto_options
+        assert "num_boost_round" not in runner._options
         assert runner.lgbm_kwargs["num_boost_round"] == 5
 
     def test__parse_args_wrapper_args(self):
@@ -358,7 +358,7 @@ class TestLightGBMTuner(object):
         new_args = ["time_budget", "time_budget", "best_params", "sample_size"]
         for new_arg in new_args:
             assert new_arg not in runner.lgbm_kwargs
-            assert new_arg in runner.auto_options
+            assert new_arg in runner._options
 
     @pytest.mark.parametrize(
         "metric, study_direction, expected",
