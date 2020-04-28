@@ -6,6 +6,7 @@ import pickle
 import time
 from typing import Any
 from typing import Dict
+from typing import List
 import warnings
 
 import lightgbm as lgb
@@ -20,13 +21,11 @@ from optuna import type_checking
 if type_checking.TYPE_CHECKING:
     from typing import Callable  # NOQA
     from typing import Generator  # NOQA
-    from typing import List  # NOQA
     from typing import Optional  # NOQA
     from typing import Tuple  # NOQA
     from typing import Union  # NOQA
 
     from optuna.distributions import BaseDistribution  # NOQA
-    from optuna.trial import FrozenTrial  # NOQA
     from optuna.study import Study  # NOQA
     from optuna.trial import Trial  # NOQA
 
@@ -122,8 +121,7 @@ class BaseTuner(object):
         val_score = booster.best_score[valid_name][metric]
         return val_score
 
-    def _metric_with_eval_at(self, metric):
-        # type: (str) -> str
+    def _metric_with_eval_at(self, metric: str) -> str:
 
         if metric != "ndcg" and metric != "map":
             return metric
@@ -148,16 +146,14 @@ class BaseTuner(object):
             "'{}' is specified.".format(eval_at)
         )
 
-    def higher_is_better(self):
-        # type: () -> bool
+    def _higher_is_better(self) -> bool:
 
         metric_name = self.lgbm_params.get("metric", "binary_logloss")
         return metric_name.startswith(("auc", "ndcg", "map"))
 
-    def compare_validation_metrics(self, val_score, best_score):
-        # type: (float, float) -> bool
+    def _compare_validation_metrics(self, val_score: float, best_score: float) -> bool:
 
-        if self.higher_is_better():
+        if self._higher_is_better():
             return val_score > best_score
         else:
             return val_score < best_score
@@ -256,7 +252,7 @@ class OptunaObjective(BaseTuner):
                 pickle.dump(booster, fout)
             _logger.info("The booster of trial#{} was saved as {}.".format(trial.number, path))
 
-        if self.compare_validation_metrics(val_score, self.best_score):
+        if self._compare_validation_metrics(val_score, self.best_score):
             self.best_score = val_score
             self.best_booster_with_trial_number = (booster, trial.number)
 
@@ -409,12 +405,12 @@ class LightGBMTuner(BaseTuner):
 
         if study is None:
             self.study = optuna.create_study(
-                direction="maximize" if self.higher_is_better() else "minimize"
+                direction="maximize" if self._higher_is_better() else "minimize"
             )
         else:
             self.study = study
 
-        if self.higher_is_better():
+        if self._higher_is_better():
             if self.study.direction != optuna.study.StudyDirection.MAXIMIZE:
                 metric_name = self.lgbm_params.get("metric", "binary_logloss")
                 raise ValueError(
@@ -439,7 +435,7 @@ class LightGBMTuner(BaseTuner):
             return self.study.best_value
         except ValueError:
             # Return the default score because no trials have completed.
-            return -np.inf if self.higher_is_better() else np.inf
+            return -np.inf if self._higher_is_better() else np.inf
 
     @property
     def best_params(self) -> Dict[str, Any]:
@@ -506,15 +502,7 @@ class LightGBMTuner(BaseTuner):
 
         return booster
 
-    def _get_params(self):
-        # type: () -> Dict[str, Any]
-
-        params = copy.deepcopy(self.lgbm_params)
-        params.update(self.best_params)
-        return params
-
-    def _parse_args(self, *args, **kwargs):
-        # type: (Any, Any) -> None
+    def _parse_args(self, *args: Any, **kwargs: Any) -> None:
 
         self._options = {
             option_name: kwargs.get(option_name)
@@ -533,8 +521,8 @@ class LightGBMTuner(BaseTuner):
                 del kwargs[option_name]
 
         self.lgbm_params = args[0]
-        self.train_set = args[1]
-        self.train_subset = None  # Use for sampling.
+        self._train_set = args[1]
+        self._train_subset = None  # Use for sampling.
         self.lgbm_kwargs = kwargs
 
     def run(self) -> None:
@@ -550,7 +538,7 @@ class LightGBMTuner(BaseTuner):
         _handling_alias_parameters(self.lgbm_params)
 
         # Sampling.
-        self.sample_train_set()
+        self._sample_train_set()
 
         # Tuning.
         time_budget = self._options["time_budget"]
@@ -581,22 +569,20 @@ class LightGBMTuner(BaseTuner):
             if time_budget is not None and time_budget < t.elapsed_secs():
                 return
 
-    def sample_train_set(self):
-        # type: () -> None
+    def _sample_train_set(self) -> None:
         """Make subset of `self.train_set` Dataset object."""
 
         if self._options["sample_size"] is None:
             return
 
-        self.train_set.construct()
-        n_train_instance = self.train_set.get_label().shape[0]
+        self._train_set.construct()
+        n_train_instance = self._train_set.get_label().shape[0]
         if n_train_instance > self._options["sample_size"]:
             offset = n_train_instance - self._options["sample_size"]
             idx_list = offset + np.arange(self._options["sample_size"])
-            self.train_subset = self.train_set.subset(idx_list)
+            self._train_subset = self._train_set.subset(idx_list)
 
-    def tune_feature_fraction(self, n_trials=7):
-        # type: (int) -> None
+    def tune_feature_fraction(self, n_trials: int = 7) -> None:
 
         param_name = "feature_fraction"
         param_values = np.linspace(0.4, 1.0, n_trials).tolist()
@@ -607,20 +593,17 @@ class LightGBMTuner(BaseTuner):
             sampler = optuna.samplers.GridSampler({param_name: param_values})
         self.tune_params([param_name], len(param_values), sampler, "feature_fraction")
 
-    def tune_num_leaves(self, n_trials=20):
-        # type: (int) -> None
+    def tune_num_leaves(self, n_trials: int = 20) -> None:
 
         self.tune_params(["num_leaves"], n_trials, optuna.samplers.TPESampler(), "num_leaves")
 
-    def tune_bagging(self, n_trials=10):
-        # type: (int) -> None
+    def tune_bagging(self, n_trials: int = 10) -> None:
 
         self.tune_params(
             ["bagging_fraction", "bagging_freq"], n_trials, optuna.samplers.TPESampler(), "bagging"
         )
 
-    def tune_feature_fraction_stage2(self, n_trials=6):
-        # type: (int) -> None
+    def tune_feature_fraction_stage2(self, n_trials: int = 6) -> None:
 
         param_name = "feature_fraction"
         best_feature_fraction = self.best_params[param_name]
@@ -635,8 +618,7 @@ class LightGBMTuner(BaseTuner):
             sampler = optuna.samplers.GridSampler({param_name: param_values})
         self.tune_params([param_name], len(param_values), sampler, "feature_fraction_stage2")
 
-    def tune_regularization_factors(self, n_trials=20):
-        # type: (int) -> None
+    def tune_regularization_factors(self, n_trials: int = 20) -> None:
 
         self.tune_params(
             ["lambda_l1", "lambda_l2"],
@@ -645,8 +627,7 @@ class LightGBMTuner(BaseTuner):
             "regularization_factors",
         )
 
-    def tune_min_data_in_leaf(self):
-        # type: () -> None
+    def tune_min_data_in_leaf(self) -> None:
 
         param_name = "min_child_samples"
         param_values = [5, 10, 25, 50, 100]
@@ -657,17 +638,22 @@ class LightGBMTuner(BaseTuner):
             sampler = optuna.samplers.GridSampler({param_name: param_values})
         self.tune_params([param_name], len(param_values), sampler, "min_data_in_leaf")
 
-    def tune_params(self, target_param_names, n_trials, sampler, step_name):
-        # type: (List[str], int, optuna.samplers.BaseSampler, str) -> None
+    def tune_params(
+        self,
+        target_param_names: List[str],
+        n_trials: int,
+        sampler: optuna.samplers.BaseSampler,
+        step_name: str,
+    ) -> None:
 
         pbar = tqdm.tqdm(total=n_trials, ascii=True)
 
         # Set current best parameters.
         self.lgbm_params.update(self.best_params)
 
-        train_set = self.train_set
-        if self.train_subset is not None:
-            train_set = self.train_subset
+        train_set = self._train_set
+        if self._train_subset is not None:
+            train_set = self._train_subset
 
         objective = OptunaObjective(
             target_param_names,
@@ -724,8 +710,7 @@ class LightGBMTuner(BaseTuner):
                 )
                 self._step_name = step_name
 
-            def get_trials(self, deepcopy=True):
-                # type: (bool) -> List[optuna.trial.FrozenTrial]
+            def get_trials(self, deepcopy: bool = True) -> List[optuna.trial.FrozenTrial]:
 
                 trials = super().get_trials(deepcopy=deepcopy)
                 return [
@@ -735,8 +720,7 @@ class LightGBMTuner(BaseTuner):
                 ]
 
             @property
-            def best_trial(self):
-                # type: () -> optuna.trial.FrozenTrial
+            def best_trial(self) -> optuna.trial.FrozenTrial:
                 """Return the best trial in the study.
 
                 Returns:

@@ -143,11 +143,11 @@ class TestBaseTuner(object):
             "mean_average_precision",
         ]:
             tuner = BaseTuner(lgbm_params={"metric": metric})
-            assert tuner.higher_is_better()
+            assert tuner._higher_is_better()
 
         for metric in ["rmsle", "rmse", "binary_logloss"]:
             tuner = BaseTuner(lgbm_params={"metric": metric})
-            assert not tuner.higher_is_better()
+            assert not tuner._higher_is_better()
 
     def test_get_booster_best_score__using_valid_names_as_str(self):
         # type: () -> None
@@ -211,15 +211,15 @@ class TestBaseTuner(object):
             "mean_average_precision",
         ]:
             tuner = BaseTuner(lgbm_params={"metric": metric})
-            assert tuner.compare_validation_metrics(0.5, 0.1)
-            assert not tuner.compare_validation_metrics(0.5, 0.5)
-            assert not tuner.compare_validation_metrics(0.1, 0.5)
+            assert tuner._compare_validation_metrics(0.5, 0.1)
+            assert not tuner._compare_validation_metrics(0.5, 0.5)
+            assert not tuner._compare_validation_metrics(0.1, 0.5)
 
         for metric in ["rmsle", "rmse", "binary_logloss"]:
             tuner = BaseTuner(lgbm_params={"metric": metric})
-            assert not tuner.compare_validation_metrics(0.5, 0.1)
-            assert not tuner.compare_validation_metrics(0.5, 0.5)
-            assert tuner.compare_validation_metrics(0.1, 0.5)
+            assert not tuner._compare_validation_metrics(0.5, 0.1)
+            assert not tuner._compare_validation_metrics(0.5, 0.5)
+            assert tuner._compare_validation_metrics(0.1, 0.5)
 
     @pytest.mark.parametrize(
         "metric, eval_at_param, expected",
@@ -397,12 +397,12 @@ class TestLightGBMTuner(object):
         runner = self._get_tuner_object(
             train_set=train_dataset, kwargs_options=dict(sample_size=sample_size)
         )
-        runner.sample_train_set()
+        runner._sample_train_set()
 
         # Workaround for mypy.
         if not type_checking.TYPE_CHECKING:
-            runner.train_subset.construct()  # Cannot get label before construct `lgb.Dataset`.
-            assert runner.train_subset.get_label().shape[0] == sample_size
+            runner._train_subset.construct()  # Cannot get label before construct `lgb.Dataset`.
+            assert runner._train_subset.get_label().shape[0] == sample_size
 
     def test_tune_feature_fraction(self):
         # type: () -> None
@@ -578,7 +578,7 @@ class TestLightGBMTuner(object):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=DeprecationWarning)
             tuner = LightGBMTuner(params, None, valid_sets=valid_sets)
-        assert not tuner.higher_is_better()
+        assert not tuner._higher_is_better()
 
         with mock.patch("lightgbm.train"), mock.patch.object(
             BaseTuner, "_get_booster_best_score", return_value=0.9
