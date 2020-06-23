@@ -12,7 +12,7 @@ on:
 
 env:
   DOCKER_BASE_NAME: docker.pkg.github.com/${{ github.repository }}/optuna
-  DOCKER_HUB_BASE_NAME: optuna/optuna
+  DOCKER_HUB_BASE_NAME: toshihikoyanase/optuna
 
 jobs:
 
@@ -26,7 +26,7 @@ jobs:
         build_type: ['', 'dev']  # "dev" installs all the dependencies including pytest.
 
     # This action cannot be executed in the forked repository.
-    if: github.repository == 'optuna/optuna'
+    if: github.repository == 'toshihikoyanase/optuna'
     steps:
     - uses: actions/checkout@v2
 
@@ -47,9 +47,9 @@ jobs:
         docker build . --build-arg PYTHON_VERSION=${{ matrix.python_version }} --build-arg BUILD_TYPE=${{ matrix.build_type }} --file Dockerfile --tag "${HUB_TAG}"
 
     - name: Login & Push to Docker Hub
-      if: ${{ github.event_name != 'pull_request' }}
+      # if: ${{ github.event_name != 'pull_request' }}
       env:
         DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
       run: |
-        echo "${DOCKER_HUB_TOKEN}" | docker login -u optunabot --password-stdin
+        echo "${DOCKER_HUB_TOKEN}" | docker login -u toshihikoyanase --password-stdin
         docker push "${HUB_TAG}"
