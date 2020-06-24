@@ -1,6 +1,6 @@
 name: Add Documentation Link
 
-on: status
+on: push
 
 jobs:
   doc-link:
