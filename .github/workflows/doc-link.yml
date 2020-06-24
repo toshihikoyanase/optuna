@@ -7,6 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     if: "github.event.context == 'ci/circleci: document'"
     steps:
+    - name: Dump GitHub context
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: echo "$GITHUB_CONTEXT"
     - uses: larsoner/circleci-artifacts-redirector-action@master
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
