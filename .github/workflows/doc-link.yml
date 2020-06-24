@@ -5,7 +5,7 @@ on: push
 jobs:
   doc-link:
     runs-on: ubuntu-latest
-    if: "github.event.context == 'ci/circleci: document'"
+    # if: "github.event.context == 'ci/circleci: document'"
     steps:
     - name: Dump GitHub context
       env:
