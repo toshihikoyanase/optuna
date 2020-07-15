@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - tmp-allennlp-pruning-callback
   pull_request: {}
   schedule:
     - cron: '0 23 * * SUN-THU'
@@ -17,7 +18,7 @@ jobs:
         python-version: [3.5, 3.6, 3.7, 3.8]
 
     # Not intended for forks.
-    if: github.repository == 'optuna/optuna'
+    # if: github.repository == 'optuna/optuna'
 
     steps:
     - name: Checkout
