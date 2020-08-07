@@ -30,6 +30,55 @@ Optuna has modern functionalities as follows:
 - [Parallel distributed optimization](https://optuna.readthedocs.io/en/stable/tutorial/distributed.html)
 - [Pruning of unpromising trials](https://optuna.readthedocs.io/en/stable/tutorial/pruning.html)
 
+## Installation
+
+Optuna is available at [the Python Package Index](https://pypi.org/project/optuna/) and on [Anaconda Cloud](https://anaconda.org/conda-forge/optuna).
+
+```bash
+# PyPI
+$ pip install optuna
+```
+
+```bash
+# Anaconda Cloud
+$ conda install -c conda-forge optuna
+```
+
+Optuna supports Python 3.5 or newer.
+
+Also, we also provide Optuna docker images on [DockerHub](https://hub.docker.com/r/optuna/optuna).
+
+**Try your first optimization**
+
+The following example simply minimize `f(x)=x`.
+
+```shell
+$ python
+```
+
+```python
+>>> import optuna
+>>> study = optuna.create_study()
+>>> def f(trial):
+...     return trial.suggest_float("x", 0, 1)
+>>> study.optimize(f, n_trials=3)
+[I 2020-08-07 11:54:58,046] Trial 0 finished with value: 0.821 and parameters: {'x': 0.821}. Best is trial 0 with value: 0.821.
+...
+```
+
+For further details, see the [tutorials](https://optuna.readthedocs.io/en/stable/tutorial/index.html).
+
+
+## Contribution
+
+Any contributions to Optuna are more than welcome!
+
+If you are new to Optuna, please check the [good first issues](https://github.com/optuna/optuna/labels/good%20first%20issue). They are relatively simple, well-defined and are often good starting points for you to get familiar with the contribution workflow and other developers.
+
+If you already have contributed to Optuna, we recommend the other [contribution-welcome issues](https://github.com/optuna/optuna/labels/contribution-welcome).
+
+For general guidelines how to contribute to the project, take a look at [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 
 ## Basic Concepts
 
@@ -91,23 +140,6 @@ study.optimize(objective, n_trials=100)  # Invoke optimization of the objective 
 * [FastAI](./examples/fastai_simple.py)
 * [AllenNLP](./examples/allennlp)
 
-## Installation
-
-Optuna is available at [the Python Package Index](https://pypi.org/project/optuna/) and on [Anaconda Cloud](https://anaconda.org/conda-forge/optuna).
-
-```bash
-# PyPI
-$ pip install optuna
-```
-
-```bash
-# Anaconda Cloud
-$ conda install -c conda-forge optuna
-```
-
-Optuna supports Python 3.5 or newer.
-
-Also, we also provide Optuna docker images on [DockerHub](https://hub.docker.com/r/optuna/optuna).
 
 ## Communication
 
@@ -118,17 +150,6 @@ Also, we also provide Optuna docker images on [DockerHub](https://hub.docker.com
 [GitHub issues]: https://github.com/optuna/optuna/issues
 [Gitter]: https://gitter.im/optuna/optuna
 [Stack Overflow]: https://stackoverflow.com/questions/tagged/optuna
-
-
-## Contribution
-
-Any contributions to Optuna are more than welcome!
-
-If you are new to Optuna, please check the [good first issues](https://github.com/optuna/optuna/labels/good%20first%20issue). They are relatively simple, well-defined and are often good starting points for you to get familiar with the contribution workflow and other developers.
-
-If you already have contributed to Optuna, we recommend the other [contribution-welcome issues](https://github.com/optuna/optuna/labels/contribution-welcome).
-
-For general guidelines how to contribute to the project, take a look at [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 
 ## Reference
