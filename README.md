@@ -66,7 +66,7 @@ $ python
 ...
 ```
 
-For further details, see the [tutorials](https://optuna.readthedocs.io/en/stable/tutorial/index.html).
+For further details, see [basic concepts](#basic-concepts) and [tutorials](https://optuna.readthedocs.io/en/stable/tutorial/index.html).
 
 
 ## Contribution
