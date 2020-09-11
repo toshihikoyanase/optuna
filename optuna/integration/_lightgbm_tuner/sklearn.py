@@ -34,6 +34,7 @@ from sklearn.utils.validation import _assert_all_finite
 from sklearn.utils.validation import _num_samples
 from sklearn.utils.validation import column_or_1d
 
+import optuna
 from optuna import distributions
 from optuna import integration
 from optuna.integration._lightgbm_tuner import alias
@@ -575,6 +576,7 @@ class LGBMModel(lgb.LGBMModel):
         y: OneDimArrayLikeType,
         sample_weight: Optional[OneDimArrayLikeType] = None,
         group: Optional[OneDimArrayLikeType] = None,
+        eval_set: Optional[List[Tuple[TwoDimArrayLikeType, OneDimArrayLikeType]]] = None,
         eval_metric: Optional[Union[Callable, List[str], str]] = None,
         early_stopping_rounds: Optional[int] = 10,
         feature_name: Union[List[str], str] = "auto",
@@ -641,6 +643,7 @@ class LGBMModel(lgb.LGBMModel):
                 Return self.
         """
         logger = logging.get_logger(__name__)
+        self._n_features_in = self._n_features
 
         X, y, sample_weight = check_fit_params(
             X,
@@ -653,8 +656,40 @@ class LGBMModel(lgb.LGBMModel):
         )
 
         n_samples, self._n_features = X.shape
+        if eval_set is not None:
+            params = self.get_params()
+            _params = copy.copy(params)
+            del _params["boosting_type"]
+            _params["verbosity"] = -1
 
-        self._n_features_in = self._n_features
+            train_dataset = lgb.Dataset(
+                X,
+                label=y,
+                weight=sample_weight,
+                feature_name=feature_name,
+                categorical_feature=categorical_feature,
+            )
+            valid_sets = [train_dataset]
+            for val in eval_set:
+                valid_sets.append(
+                    lgb.Dataset(
+                        val[0],
+                        label=val[1],
+                        weight=sample_weight,
+                        feature_name=feature_name,
+                        categorical_feature=categorical_feature,
+                    )
+                )
+
+            tuner = optuna.integration.lightgbm.LightGBMTuner(
+                _params,
+                train_dataset,
+                valid_sets=valid_sets,
+                model_dir="/tmp/lgbt",
+            )
+            tuner.run()
+            self._Booster = tuner.get_best_booster()
+            return self
 
         is_classifier = self._estimator_type == "classifier"
         cv = check_cv(self.cv, y, is_classifier)
@@ -1008,6 +1043,7 @@ class LGBMClassifier(LGBMModel, ClassifierMixin):
         y: OneDimArrayLikeType,
         sample_weight: Optional[OneDimArrayLikeType] = None,
         group: Optional[OneDimArrayLikeType] = None,
+        eval_set: Optional[List[Tuple[TwoDimArrayLikeType, OneDimArrayLikeType]]] = None,
         eval_metric: Optional[Union[Callable, List[str], str]] = None,
         early_stopping_rounds: Optional[int] = 10,
         feature_name: Union[List[str], str] = "auto",
@@ -1030,6 +1066,7 @@ class LGBMClassifier(LGBMModel, ClassifierMixin):
             y,
             sample_weight=sample_weight,
             group=group,
+            eval_set=eval_set,
             eval_metric=eval_metric,
             early_stopping_rounds=early_stopping_rounds,
             feature_name=feature_name,
