@@ -417,6 +417,10 @@ class Study(BaseStudy):
         trial_id = self._pop_waiting_trial_id()
         if trial_id is None:
             trial_id = self._storage.create_new_trial(self._study_id)
+
+        # update the trial state to running and **change the datetime_start**
+        self._storage.set_trial_state(trial_id, TrialState.RUNNING)
+
         return trial_module.Trial(self, trial_id)
 
     def tell(
