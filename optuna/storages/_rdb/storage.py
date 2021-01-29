@@ -519,7 +519,12 @@ class RDBStorage(BaseStorage):
         self, study_id: int, template_trial: Optional[FrozenTrial], session: orm.Session
     ) -> models.TrialModel:
         if template_trial is None:
-            trial = models.TrialModel(study_id=study_id, number=None, state=TrialState.RUNNING)
+            trial = models.TrialModel(
+                study_id=study_id,
+                number=None,
+                state=TrialState.RUNNING,
+                datetime_start=datetime.now(),
+            )
         else:
             # Because only `RUNNING` trials can be updated,
             # we temporarily set the state of the new trial to `RUNNING`.
