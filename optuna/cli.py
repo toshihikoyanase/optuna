@@ -63,6 +63,14 @@ class _CreateStudy(_BaseCommand):
             "for minimization and 'maximize' for maximization.",
         )
         parser.add_argument(
+            "--directions",
+            type=str,
+            nargs="*",
+            choices=("minimize", "maximize"),
+            help="Set direction of optimization to a new study. Set 'minimize' "
+            "for minimization and 'maximize' for maximization.",
+        )
+        parser.add_argument(
             "--skip-if-exists",
             default=False,
             action="store_true",
@@ -75,12 +83,21 @@ class _CreateStudy(_BaseCommand):
 
         storage_url = _check_storage_url(self.app_args.storage)
         storage = optuna.storages.get_storage(storage_url)
-        study_name = optuna.create_study(
-            storage=storage,
-            study_name=parsed_args.study_name,
-            direction=parsed_args.direction,
-            load_if_exists=parsed_args.skip_if_exists,
-        ).study_name
+        if parsed_args.directions:
+            study_name = optuna.create_study(
+                storage=storage,
+                study_name=parsed_args.study_name,
+                directions=parsed_args.directions,
+                load_if_exists=parsed_args.skip_if_exists,
+            ).study_name
+        else:
+            study_name = optuna.create_study(
+                storage=storage,
+                study_name=parsed_args.study_name,
+                direction=parsed_args.direction,
+                load_if_exists=parsed_args.skip_if_exists,
+            ).study_name
+
         print(study_name)
 
 
@@ -311,6 +328,82 @@ class _StudyOptimize(_BaseCommand):
             n_trials=parsed_args.n_trials,
             timeout=parsed_args.timeout,
             n_jobs=parsed_args.n_jobs,
+        )
+        return 0
+
+
+class _StudyAsk(_BaseCommand):
+    """Create a trial by calling Study.ask()."""
+
+    def get_parser(self, prog_name: str) -> ArgumentParser:
+
+        parser = super(_StudyAsk, self).get_parser(prog_name)
+        parser.add_argument(
+            "--study-name", required=True, help="The name of the study to ask hyperparameters."
+        )
+        parser.add_argument(
+            "--out", required=True, help="The name of the study to start optimization on."
+        )
+        parser.add_argument(
+            "--ppe-config",
+            dest="ppe_config",
+            required=True,
+            help="Python script file where the objective function resides.",
+        )
+        return parser
+
+    def take_action(self, parsed_args: Namespace) -> int:
+
+        storage_url = _check_storage_url(self.app_args.storage)
+        study = optuna.load_study(storage=storage_url, study_name=parsed_args.study_name)
+        if len(study.directions) > 1:
+            study = optuna.load_study(
+                storage=storage_url,
+                study_name=parsed_args.study_name,
+                sampler=optuna.samplers.NSGAIISampler(),
+            )
+
+        # We force enabling the debug flag. As we are going to execute user codes, we want to show
+        # exception stack traces by default.
+        self.app.options.debug = True
+        trial = study.ask()
+        with open(parsed_args.ppe_config) as fin:
+            config_str = fin.read()
+        suggested_config = optuna.integration.suggest_ppe_optuna_types(trial, config_str)
+        with open(parsed_args.out, "w") as fout:
+            fout.write(suggested_config)
+        print(trial.number)
+
+        return 0
+
+
+class _StudyTell(_BaseCommand):
+    """Create a trial by calling Study.tell()."""
+
+    def get_parser(self, prog_name: str) -> ArgumentParser:
+
+        parser = super(_StudyTell, self).get_parser(prog_name)
+        parser.add_argument(
+            "--study-name", required=True, help="The name of the study to ask hyperparameters."
+        )
+        parser.add_argument("--trial-number", type=int, required=True, help="The trial number.")
+        parser.add_argument(
+            "--values", nargs="+", required=True, type=float, help="Objective values."
+        )
+        return parser
+
+    def take_action(self, parsed_args: Namespace) -> int:
+
+        storage_url = _check_storage_url(self.app_args.storage)
+        study = optuna.load_study(storage=storage_url, study_name=parsed_args.study_name)
+
+        # We force enabling the debug flag. As we are going to execute user codes, we want to show
+        # exception stack traces by default.
+        self.app.options.debug = True
+
+        study.tell(parsed_args.trial_number, parsed_args.values)
+        self.logger.info(
+            f"Trial {parsed_args.trial_number} finished with value: {parsed_args.values}."
         )
         return 0
 

@@ -234,6 +234,8 @@ setup(
             "dashboard = optuna.cli:_Dashboard",
             "study optimize = optuna.cli:_StudyOptimize",
             "storage upgrade = optuna.cli:_StorageUpgrade",
+            "study ask = optuna.cli:_StudyAsk",
+            "study tell = optuna.cli:_StudyTell",
         ],
     },
     classifiers=[

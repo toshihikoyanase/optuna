@@ -17,6 +17,7 @@ _import_structure = {
     "lightgbm": ["LightGBMPruningCallback", "LightGBMTuner", "LightGBMTunerCV"],
     "pytorch_ignite": ["PyTorchIgnitePruningHandler"],
     "pytorch_lightning": ["PyTorchLightningPruningCallback"],
+    "pytorch_pfn_extras": ["suggest_ppe_optuna_types"],
     "sklearn": ["OptunaSearchCV"],
     "skorch": ["SkorchPruningCallback"],
     "mxnet": ["MXNetPruningCallback"],
@@ -53,6 +54,7 @@ if TYPE_CHECKING:
     from optuna.integration.mxnet import MXNetPruningCallback  # NOQA
     from optuna.integration.pytorch_ignite import PyTorchIgnitePruningHandler  # NOQA
     from optuna.integration.pytorch_lightning import PyTorchLightningPruningCallback  # NOQA
+    from optuna.integration.pytorch_pfn_extras import suggest_ppe_optuna_types  # NOQA
     from optuna.integration.sklearn import OptunaSearchCV  # NOQA
     from optuna.integration.skopt import SkoptSampler  # NOQA
     from optuna.integration.skorch import SkorchPruningCallback  # NOQA
