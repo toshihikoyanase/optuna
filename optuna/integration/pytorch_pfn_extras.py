@@ -17,11 +17,11 @@ def suggest_ppe_optuna_types(trial: optuna.trial.Trial, ppe_config_str: str) -> 
 
     config = yaml.load(ppe_config_str)
     keys = _retrieve_optuna_keys(config)
-    config = Config(config, optuna_types(trial))
+    ppe_config = Config(config, optuna_types(trial))
     # Suggest all params.
     for k in keys:
-        config[k]
-    return _traverse_and_replace(trial.params, ppe_config_str)
+        ppe_config[k]
+    return yaml.dump(_traverse_and_replace(trial.params, config))
 
 
 def _traverse_and_replace(params: Dict[str, Any], item) -> Any:
