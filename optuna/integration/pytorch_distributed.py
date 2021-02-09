@@ -206,7 +206,7 @@ def _call_and_communicate(func: Callable, dtype: "torch.dtype") -> Any:
         result = func()
         buffer[0] = result
     if dist.get_backend() == "nccl":
-        buffer = buffer.cuda(torch.device(rank))
+        buffer = buffer.cuda()
     dist.broadcast(buffer, src=0)
     return buffer.item()
 
@@ -220,14 +220,14 @@ def _call_and_communicate_obj(func: Callable) -> Any:
         buffer = _to_tensor(result)
         size_buffer[0] = buffer.shape[0]
     if dist.get_backend() == "nccl":
-        size_buffer = size_buffer.cuda(torch.device(rank))
+        size_buffer = size_buffer.cuda()
     dist.broadcast(size_buffer, src=0)
     buffer_size = int(size_buffer.item())
     if rank != 0:
         buffer = torch.empty(buffer_size, dtype=torch.uint8)
     assert buffer is not None
     if dist.get_backend() == "nccl":
-        buffer = buffer.cuda(torch.device(rank))
+        buffer = buffer.cuda()
     dist.broadcast(buffer, src=0)
     return _from_tensor(buffer)
 
