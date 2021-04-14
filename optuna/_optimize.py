@@ -47,6 +47,8 @@ def _optimize(
     callbacks: Optional[List[Callable[["optuna.Study", FrozenTrial], None]]] = None,
     gc_after_trial: bool = False,
     show_progress_bar: bool = False,
+    *,
+    preprocess: Optional[List[Callable[["optuna.Study", FrozenTrial], None]]] = None,
 ) -> None:
     if not isinstance(catch, tuple):
         raise TypeError(
@@ -74,6 +76,7 @@ def _optimize(
                 reseed_sampler_rng=False,
                 time_start=None,
                 progress_bar=progress_bar,
+                preprocess=preprocess,
             )
         else:
             if show_progress_bar:
@@ -118,6 +121,7 @@ def _optimize(
                             True,
                             time_start,
                             None,
+                            preprocess=preprocess,
                         )
                     )
     finally:
@@ -136,6 +140,8 @@ def _optimize_sequential(
     reseed_sampler_rng: bool,
     time_start: Optional[datetime.datetime],
     progress_bar: Optional[pbar_module._ProgressBar],
+    *,
+    preprocess: Optional[List[Callable[["optuna.Study", FrozenTrial], None]]],
 ) -> None:
     if reseed_sampler_rng:
         study.sampler.reseed_rng()
@@ -160,7 +166,7 @@ def _optimize_sequential(
                 break
 
         try:
-            trial = _run_trial(study, func, catch)
+            trial = _run_trial(study, func, catch, preprocess)
         except Exception:
             raise
         finally:
@@ -186,6 +192,7 @@ def _run_trial(
     study: "optuna.Study",
     func: "optuna.study.ObjectiveFuncType",
     catch: Tuple[Type[Exception], ...],
+    preprocess: Optional[List[Callable[["optuna.Study", FrozenTrial], None]]] = None,
 ) -> trial_module.Trial:
     if study._storage.is_heartbeat_enabled():
         failed_trial_ids = study._storage.fail_stale_trials(study._study_id)
@@ -196,6 +203,11 @@ def _run_trial(
                 failed_trial_callback(study, failed_trial)
 
     trial = study.ask()
+
+    if preprocess is not None:
+        frozen_trial = copy.deepcopy(study._storage.get_trial(trial._trial_id))
+        for callback in preprocess:
+            callback(study, frozen_trial)
 
     state: Optional[TrialState] = None
     values: Optional[List[float]] = None

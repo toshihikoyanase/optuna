@@ -307,6 +307,8 @@ class Study(BaseStudy):
         callbacks: Optional[List[Callable[["Study", FrozenTrial], None]]] = None,
         gc_after_trial: bool = False,
         show_progress_bar: bool = False,
+        *,
+        preprocess: Optional[List[Callable[["Study", FrozenTrial], None]]] = None,
     ) -> None:
         """Optimize an objective function.
 
@@ -384,6 +386,10 @@ class Study(BaseStudy):
                 Flag to show progress bars or not. To disable progress bar, set this ``False``.
                 Currently, progress bar is experimental feature and disabled
                 when ``n_jobs`` :math:`\\ne 1`.
+            preprocess:
+                List of functions that are invoked at the beginning of each trial. Each function
+                must accept two parameters with the following types in this order:
+                :class:`~optuna.study.Study` and :class:`~optuna.FrozenTrial`.
 
         Raises:
             RuntimeError:
@@ -407,6 +413,7 @@ class Study(BaseStudy):
             callbacks=callbacks,
             gc_after_trial=gc_after_trial,
             show_progress_bar=show_progress_bar,
+            preprocess=preprocess,
         )
 
     def ask(

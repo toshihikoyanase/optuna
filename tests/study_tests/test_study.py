@@ -668,6 +668,73 @@ def test_callbacks(n_jobs: int) -> None:
     assert states == []
 
 
+@pytest.mark.parametrize("n_jobs", [1, 4])
+def test_preprocess(n_jobs: int) -> None:
+
+    lock = threading.Lock()
+
+    def with_lock(f: CallbackFuncType) -> CallbackFuncType:
+        def preprocess(study: Study, trial: FrozenTrial) -> None:
+
+            with lock:
+                f(study, trial)
+
+        return preprocess
+
+    study = create_study()
+
+    def objective(trial: Trial) -> float:
+
+        return trial.suggest_int("x", 1, 1)
+
+    # Empty preprocess list.
+    study.optimize(objective, n_trials=10, n_jobs=n_jobs, preprocess=[])
+
+    # A preprocess function.
+    study = create_study()
+    numbers = []
+    preprocess = [with_lock(lambda study, trial: numbers.append(trial.number))]
+    study.optimize(objective, n_trials=10, n_jobs=n_jobs, preprocess=preprocess)
+    assert numbers == list(range(10))
+
+    # Two preprocess functions.
+    study = create_study()
+    numbers = []
+    constants = []
+    preprocess = [
+        with_lock(lambda study, trial: numbers.append(trial.number)),
+        with_lock(lambda study, trial: constants.append(1)),
+    ]
+    study.optimize(objective, n_trials=10, n_jobs=n_jobs, preprocess=preprocess)
+    assert numbers == list(range(10))
+    assert constants == [1] * 10
+
+    # If a trial is failed with an exception and the exception is caught by the study,
+    # preprocess is invoked.
+    study = create_study()
+    states = []
+    preprocess = [with_lock(lambda study, trial: states.append(trial.state))]
+    study.optimize(
+        lambda t: 1 / 0,
+        n_trials=10,
+        n_jobs=n_jobs,
+        catch=(ZeroDivisionError,),
+        preprocess=preprocess,
+    )
+    assert states == [TrialState.RUNNING] * 10
+
+    # If a trial is failed with an exception and the exception isn't caught by the study,
+    # preprocess is invoked.
+    study = create_study()
+    states = []
+    preprocess = [with_lock(lambda study, trial: states.append(trial.state))]
+    with pytest.raises(ZeroDivisionError):
+        study.optimize(
+            lambda t: 1 / 0, n_trials=10, n_jobs=n_jobs, catch=(), preprocess=preprocess
+        )
+    assert states == [TrialState.RUNNING] * n_jobs
+
+
 @pytest.mark.parametrize("storage_mode", STORAGE_MODES)
 def test_get_trials(storage_mode: str) -> None:
 
