@@ -2,9 +2,12 @@ from collections import OrderedDict
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Sequence
+from typing import Tuple
 from typing import Union
+
 import warnings
 
 import numpy
@@ -14,6 +17,7 @@ from optuna._experimental import experimental
 from optuna._imports import try_import
 from optuna._transform import _SearchSpaceTransform
 from optuna.distributions import BaseDistribution
+from optuna.distributions import CategoricalDistribution
 from optuna.samplers import BaseSampler
 from optuna.samplers import IntersectionSearchSpace
 from optuna.samplers import RandomSampler
@@ -39,11 +43,34 @@ with try_import() as _imports:
     from botorch.utils.sampling import sample_simplex
     from botorch.utils.transforms import normalize
     from botorch.utils.transforms import unnormalize
+    from gpytorch.kernels.scale_kernel import ScaleKernel
     from gpytorch.mlls import ExactMarginalLogLikelihood
     import torch
 
 
 _logger = logging.get_logger(__name__)
+
+
+class WrapperKernel(ScaleKernel):
+
+    def __init__(self, base_kernel, outputscale_prior=None, outputscale_constraint=None, one_hot_ranges=[], **kwargs):
+        self.one_hot_ranges = one_hot_ranges
+        super(WrapperKernel, self).__init__(base_kernel, outputscale_prior, outputscale_constraint, **kwargs)
+
+    def transform(self, x: torch.Tensor):
+        for one_hot_range in self.one_hot_ranges:
+            target_arange = torch.arange(one_hot_range[0], one_hot_range[1] + 1)
+            target_index = target_arange.repeat(x.size()[:-1] + (1,))
+            one_hot_idx = torch.argmax(
+                x.gather(dim=-1, index=target_index), dim=-1).view(x.size()[:-1] + (1,))
+            x.scatter_(-1, target_index, 0.)
+            x.scatter_(-1, one_hot_idx + one_hot_range[0], 1.)
+
+    def forward(self, x1, x2, last_dim_is_batch=False, diag=False, **params):
+        self.transform(torch.clone(x1))
+        self.transform(torch.clone(x2))
+
+        return super(WrapperKernel, self).forward(x1, x2, last_dim_is_batch, diag, **params)
 
 
 @experimental("2.4.0")
@@ -52,6 +79,7 @@ def qei_candidates_func(
     train_obj: "torch.Tensor",
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
+    one_hot_ranges: List[Tuple[int, int]]
 ) -> "torch.Tensor":
     """Quasi MC-based batch Expected Improvement (qEI).
 
@@ -120,6 +148,13 @@ def qei_candidates_func(
     train_x = normalize(train_x, bounds=bounds)
 
     model = SingleTaskGP(train_x, train_y, outcome_transform=Standardize(m=train_y.size(-1)))
+    # overwrite covar_module
+    model.covar_module = WrapperKernel(
+        base_kernel=model.covar_module.base_kernel,
+        batch_shape=model.covar_module.batch_shape,
+        outputscale_prior=model.covar_module.outputscale_prior,
+        one_hot_ranges=one_hot_ranges
+    )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
 
@@ -154,6 +189,7 @@ def qehvi_candidates_func(
     train_obj: "torch.Tensor",
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
+    one_hot_ranges: List[Tuple[int, int]]
 ) -> "torch.Tensor":
     """Quasi MC-based batch Expected Hypervolume Improvement (qEHVI).
 
@@ -192,6 +228,14 @@ def qehvi_candidates_func(
     train_x = normalize(train_x, bounds=bounds)
 
     model = SingleTaskGP(train_x, train_y, outcome_transform=Standardize(m=train_y.shape[-1]))
+    # overwrite covar_module
+    model.covar_module = WrapperKernel(
+        base_kernel=model.covar_module.base_kernel,
+        batch_shape=model.covar_module.batch_shape,
+        outputscale_prior=model.covar_module.outputscale_prior,
+        one_hot_ranges=one_hot_ranges
+    )
+
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
 
@@ -240,6 +284,7 @@ def qparego_candidates_func(
     train_obj: "torch.Tensor",
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
+    one_hot_ranges: List[Tuple[int, int]]
 ) -> "torch.Tensor":
     """Quasi MC-based extended ParEGO (qParEGO) for constrained multi-objective optimization.
 
@@ -277,6 +322,13 @@ def qparego_candidates_func(
     train_x = normalize(train_x, bounds=bounds)
 
     model = SingleTaskGP(train_x, train_y, outcome_transform=Standardize(m=train_y.size(-1)))
+    # overwrite covar_module
+    model.covar_module = WrapperKernel(
+        base_kernel=model.covar_module.base_kernel,
+        batch_shape=model.covar_module.batch_shape,
+        outputscale_prior=model.covar_module.outputscale_prior,
+        one_hot_ranges=one_hot_ranges
+    )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
 
@@ -322,6 +374,21 @@ def _get_default_candidates_func(
         return qehvi_candidates_func
     else:
         return qei_candidates_func
+
+
+def _get_one_hot_range(search_space: Dict[str, BaseDistribution]) -> List[Tuple[int, int]]:
+    categorical_dims = []
+    start_index = 0
+    for d in search_space.values():
+        if isinstance(d, CategoricalDistribution):
+            categorical_dims.append(
+                (start_index, start_index + len(d.choices) - 1)
+            )
+            start_index += len(d.choices)
+        else:
+            start_index += 1
+
+    return categorical_dims
 
 
 # TODO(hvy): Allow utilizing GPUs via some parameter, not having to rewrite the callback
@@ -439,6 +506,8 @@ class BoTorchSampler(BaseSampler):
         if n_trials < self._n_startup_trials:
             return {}
 
+        one_hot_ranges = _get_one_hot_range(search_space)
+
         trans = _SearchSpaceTransform(search_space)
         n_objectives = len(study.directions)
         values: Union[numpy.ndarray, torch.Tensor] = numpy.empty(
@@ -499,7 +568,7 @@ class BoTorchSampler(BaseSampler):
 
         if self._candidates_func is None:
             self._candidates_func = _get_default_candidates_func(n_objectives=n_objectives)
-        candidates = self._candidates_func(params, values, con, bounds)
+        candidates = self._candidates_func(params, values, con, bounds, one_hot_ranges)
 
         if not isinstance(candidates, torch.Tensor):
             raise TypeError("Candidates must be a torch.Tensor.")
