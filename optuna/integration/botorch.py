@@ -51,19 +51,28 @@ _logger = logging.get_logger(__name__)
 
 
 class WrapperKernel(ScaleKernel):
-
-    def __init__(self, base_kernel, outputscale_prior=None, outputscale_constraint=None, one_hot_ranges=[], **kwargs):
+    def __init__(
+        self,
+        base_kernel,
+        outputscale_prior=None,
+        outputscale_constraint=None,
+        one_hot_ranges=[],
+        **kwargs,
+    ):
         self.one_hot_ranges = one_hot_ranges
-        super(WrapperKernel, self).__init__(base_kernel, outputscale_prior, outputscale_constraint, **kwargs)
+        super(WrapperKernel, self).__init__(
+            base_kernel, outputscale_prior, outputscale_constraint, **kwargs
+        )
 
     def transform(self, x: torch.Tensor):
         for one_hot_range in self.one_hot_ranges:
             target_arange = torch.arange(one_hot_range[0], one_hot_range[1] + 1)
             target_index = target_arange.repeat(x.size()[:-1] + (1,))
-            one_hot_idx = torch.argmax(
-                x.gather(dim=-1, index=target_index), dim=-1).view(x.size()[:-1] + (1,))
-            x.scatter_(-1, target_index, 0.)
-            x.scatter_(-1, one_hot_idx + one_hot_range[0], 1.)
+            one_hot_idx = torch.argmax(x.gather(dim=-1, index=target_index), dim=-1).view(
+                x.size()[:-1] + (1,)
+            )
+            x.scatter_(-1, target_index, 0.0)
+            x.scatter_(-1, one_hot_idx + one_hot_range[0], 1.0)
 
     def forward(self, x1, x2, last_dim_is_batch=False, diag=False, **params):
         self.transform(x1)
@@ -78,7 +87,7 @@ def qei_candidates_func(
     train_obj: "torch.Tensor",
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
-    one_hot_ranges: List[Tuple[int, int]]
+    one_hot_ranges: List[Tuple[int, int]],
 ) -> "torch.Tensor":
     """Quasi MC-based batch Expected Improvement (qEI).
 
@@ -152,7 +161,7 @@ def qei_candidates_func(
         base_kernel=model.covar_module.base_kernel,
         batch_shape=model.covar_module.batch_shape,
         outputscale_prior=model.covar_module.outputscale_prior,
-        one_hot_ranges=one_hot_ranges
+        one_hot_ranges=one_hot_ranges,
     )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
@@ -188,7 +197,7 @@ def qehvi_candidates_func(
     train_obj: "torch.Tensor",
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
-    one_hot_ranges: List[Tuple[int, int]]
+    one_hot_ranges: List[Tuple[int, int]],
 ) -> "torch.Tensor":
     """Quasi MC-based batch Expected Hypervolume Improvement (qEHVI).
 
@@ -232,7 +241,7 @@ def qehvi_candidates_func(
         base_kernel=model.covar_module.base_kernel,
         batch_shape=model.covar_module.batch_shape,
         outputscale_prior=model.covar_module.outputscale_prior,
-        one_hot_ranges=one_hot_ranges
+        one_hot_ranges=one_hot_ranges,
     )
 
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
@@ -283,7 +292,7 @@ def qparego_candidates_func(
     train_obj: "torch.Tensor",
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
-    one_hot_ranges: List[Tuple[int, int]]
+    one_hot_ranges: List[Tuple[int, int]],
 ) -> "torch.Tensor":
     """Quasi MC-based extended ParEGO (qParEGO) for constrained multi-objective optimization.
 
@@ -326,7 +335,7 @@ def qparego_candidates_func(
         base_kernel=model.covar_module.base_kernel,
         batch_shape=model.covar_module.batch_shape,
         outputscale_prior=model.covar_module.outputscale_prior,
-        one_hot_ranges=one_hot_ranges
+        one_hot_ranges=one_hot_ranges,
     )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
@@ -380,9 +389,7 @@ def _get_one_hot_range(search_space: Dict[str, BaseDistribution]) -> List[Tuple[
     start_index = 0
     for d in search_space.values():
         if isinstance(d, CategoricalDistribution):
-            categorical_dims.append(
-                (start_index, start_index + len(d.choices) - 1)
-            )
+            categorical_dims.append((start_index, start_index + len(d.choices) - 1))
             start_index += len(d.choices)
         else:
             start_index += 1
