@@ -75,8 +75,8 @@ class WrapperKernel(ScaleKernel):
             x.scatter_(-1, one_hot_idx + one_hot_range[0], 1.0)
 
     def forward(self, x1, x2, last_dim_is_batch=False, diag=False, **params):
-        self.transform(x1)
-        self.transform(x2)
+        self.transform(torch.clone(x1))
+        self.transform(torch.clone(x2))
 
         return super(WrapperKernel, self).forward(x1, x2, last_dim_is_batch, diag, **params)
 
