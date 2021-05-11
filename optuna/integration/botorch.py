@@ -88,6 +88,7 @@ def qei_candidates_func(
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
     one_hot_ranges: List[Tuple[int, int]],
+    one_hot_categorical: bool
 ) -> "torch.Tensor":
     """Quasi MC-based batch Expected Improvement (qEI).
 
@@ -156,13 +157,14 @@ def qei_candidates_func(
     train_x = normalize(train_x, bounds=bounds)
 
     model = SingleTaskGP(train_x, train_y, outcome_transform=Standardize(m=train_y.size(-1)))
-    # overwrite covar_module
-    model.covar_module = WrapperKernel(
-        base_kernel=model.covar_module.base_kernel,
-        batch_shape=model.covar_module.batch_shape,
-        outputscale_prior=model.covar_module.outputscale_prior,
-        one_hot_ranges=one_hot_ranges,
-    )
+    if not one_hot_categorical:
+        # overwrite covar_module
+        model.covar_module = WrapperKernel(
+            base_kernel=model.covar_module.base_kernel,
+            batch_shape=model.covar_module.batch_shape,
+            outputscale_prior=model.covar_module.outputscale_prior,
+            one_hot_ranges=one_hot_ranges,
+        )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
 
@@ -198,6 +200,7 @@ def qehvi_candidates_func(
     train_con: Optional["torch.Tensor"],
     bounds: "torch.Tensor",
     one_hot_ranges: List[Tuple[int, int]],
+    one_hot_categorical: bool
 ) -> "torch.Tensor":
     """Quasi MC-based batch Expected Hypervolume Improvement (qEHVI).
 
@@ -236,13 +239,15 @@ def qehvi_candidates_func(
     train_x = normalize(train_x, bounds=bounds)
 
     model = SingleTaskGP(train_x, train_y, outcome_transform=Standardize(m=train_y.shape[-1]))
+
     # overwrite covar_module
-    model.covar_module = WrapperKernel(
-        base_kernel=model.covar_module.base_kernel,
-        batch_shape=model.covar_module.batch_shape,
-        outputscale_prior=model.covar_module.outputscale_prior,
-        one_hot_ranges=one_hot_ranges,
-    )
+    if not one_hot_categorical:
+        model.covar_module = WrapperKernel(
+            base_kernel=model.covar_module.base_kernel,
+            batch_shape=model.covar_module.batch_shape,
+            outputscale_prior=model.covar_module.outputscale_prior,
+            one_hot_ranges=one_hot_ranges,
+        )
 
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
@@ -331,12 +336,13 @@ def qparego_candidates_func(
 
     model = SingleTaskGP(train_x, train_y, outcome_transform=Standardize(m=train_y.size(-1)))
     # overwrite covar_module
-    model.covar_module = WrapperKernel(
-        base_kernel=model.covar_module.base_kernel,
-        batch_shape=model.covar_module.batch_shape,
-        outputscale_prior=model.covar_module.outputscale_prior,
-        one_hot_ranges=one_hot_ranges,
-    )
+    if not one_hot_categorical:
+        model.covar_module = WrapperKernel(
+            base_kernel=model.covar_module.base_kernel,
+            batch_shape=model.covar_module.batch_shape,
+            outputscale_prior=model.covar_module.outputscale_prior,
+            one_hot_ranges=one_hot_ranges,
+        )
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
 
@@ -470,6 +476,7 @@ class BoTorchSampler(BaseSampler):
         constraints_func: Optional[Callable[[FrozenTrial], Sequence[float]]] = None,
         n_startup_trials: int = 10,
         independent_sampler: Optional[BaseSampler] = None,
+        one_hot_categorical=True
     ):
         _imports.check()
 
@@ -480,6 +487,7 @@ class BoTorchSampler(BaseSampler):
 
         self._study_id: Optional[int] = None
         self._search_space = IntersectionSearchSpace()
+        self._one_hot_categorical = one_hot_categorical
 
     def infer_relative_search_space(
         self,
@@ -574,7 +582,7 @@ class BoTorchSampler(BaseSampler):
 
         if self._candidates_func is None:
             self._candidates_func = _get_default_candidates_func(n_objectives=n_objectives)
-        candidates = self._candidates_func(params, values, con, bounds, one_hot_ranges)
+        candidates = self._candidates_func(params, values, con, bounds, one_hot_ranges, self._one_hot_categorical)
 
         if not isinstance(candidates, torch.Tensor):
             raise TypeError("Candidates must be a torch.Tensor.")
