@@ -1,4 +1,5 @@
 from optuna.samplers._base import BaseSampler
+from optuna.samplers._aging import AgingEvolutionSampler
 from optuna.samplers._cmaes import CmaEsSampler
 from optuna.samplers._grid import GridSampler
 from optuna.samplers._nsga2 import NSGAIISampler
@@ -11,6 +12,7 @@ from optuna.samplers._tpe.sampler import TPESampler
 
 
 __all__ = [
+    "AgingEvolutionSampler",
     "BaseSampler",
     "CmaEsSampler",
     "GridSampler",
