@@ -139,8 +139,8 @@ class AgingEvolutionSampler(BaseSampler):
         if len(trials) >= self._population_size:
             # Aging Evolution adds the latest individual to the population and
             # removes the oldest individual from the population. So, we can
-            # simply get the 
-            parent_population = trials[-self._population_size:]
+            # simply get the
+            parent_population = trials[-self._population_size :]
             assert len(parent_population) == self._population_size
 
             p0 = self._select_parent(study, parent_population)
@@ -232,9 +232,7 @@ class AgingEvolutionSampler(BaseSampler):
         self._random_sampler.after_trial(study, trial, state, values)
 
 
-def _dominates(
-    trial0: FrozenTrial, trial1: FrozenTrial, direction: StudyDirection
-) -> bool:
+def _dominates(trial0: FrozenTrial, trial1: FrozenTrial, direction: StudyDirection) -> bool:
     if direction == StudyDirection.MINIMIZE:
         return trial0.value < trial1.value
     else:
