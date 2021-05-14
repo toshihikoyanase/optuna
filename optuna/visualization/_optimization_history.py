@@ -102,7 +102,7 @@ def _get_optimization_history_plot(
         _logger.warning("Study instance does not contain trials.")
         return go.Figure(data=[], layout=layout)
 
-    target_func = lambda t: t.value if target is None else target
+    target_func = (lambda t: t.value) if target is None else target
 
     traces = []
     if constraints_func is not None:
@@ -140,7 +140,7 @@ def _get_optimization_history_plot(
             best_values = np.maximum.accumulate([t.value for t in trials])
         if len(best_values) > 0:
             traces.insert(1,
-                go.Scatter(x=[t.number for t in trials], y=best_values, name="Best Value"),              
+                go.Scatter(x=[t.number for t in trials], y=best_values, name="Best Value"),
             )
 
     figure = go.Figure(data=traces, layout=layout)
