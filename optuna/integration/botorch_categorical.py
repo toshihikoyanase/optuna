@@ -55,21 +55,86 @@ class T(InputTransform):
         Returns:
             A `batch_shape x n x d`-dim tensor of transformed inputs.
         """
-        transformed_x = []
-        if X.shape[1] != self._dim:
-            return X
 
-        x = numpy.rint(X.numpy()).astype(int)
-        for sample in x:
+        if len(X.shape) == 2:
+            if X.shape[-1] != self._dim:
+                return X
+
+            x = numpy.rint(X.numpy()).astype(int)
             transformed_sample = []
-            for elem, max_index in zip(sample, self._max_indices_for_categorical):
-                elem = max(max_index, elem)
-                one_hot = numpy.zeros(max_index + 1)
-                one_hot[elem] = 1.
-                transformed_sample.append(one_hot)
+            for sample in X:
+                transformed_elems = []
+                for elem, max_index in zip(sample, self._max_indices_for_categorical):
+                    one_hot = numpy.zeros(max_index + 1)
+                    one_hot[int(elem)] = 1.
+                    transformed_elems.append(one_hot)
+                transformed_sample.append(numpy.concatenate(transformed_elems))
+            y = torch.DoubleTensor(numpy.array(transformed_sample))
 
-            transformed_x.append(numpy.concatenate(transformed_sample))
-        return torch.DoubleTensor(numpy.array(transformed_x))
+            return y
+        elif len(X.shape) == 3:
+            transformed_x = []
+            if X.shape[-1] != self._dim:
+                return X
+            x = numpy.rint(X.numpy()).astype(int)
+            for samples in x:
+                transformed_sample = []
+                for sample in samples:
+                    transformed_elems = []
+                    for elem, max_index in zip(sample, self._max_indices_for_categorical):
+                        one_hot = numpy.zeros(max_index + 1)
+                        one_hot[elem] = 1.
+                        transformed_elems.append(one_hot)
+                    transformed_sample.append(numpy.concatenate(transformed_elems))
+                transformed_x.append(transformed_sample)
+            y = torch.DoubleTensor(numpy.array(transformed_x))
+
+            return y
+        else:
+            raise ValueError(f"Unsupported tensor shape: {X.shape}.")
+
+    def untransform(self, X) -> torch.Tensor:
+        r"""Transform the inputs to a model.
+
+        Args:
+            X: A `batch_shape x n x d`-dim tensor of inputs.
+
+        Returns:
+            A `batch_shape x n x d`-dim tensor of transformed inputs.
+        """
+
+
+        if len(X.shape) == 2:
+            untransformed_sample = []
+            for sample in X:
+                untransformed_elems = []
+                start = 0
+                for max_index in self._max_indices_for_categorical:
+                    end = start + max_index + 1
+                    idx = numpy.argmax(sample[start:end])
+                    untransformed_elems.append(idx)
+                untransformed_sample.append(untransformed_elems)
+            y = torch.DoubleTensor(numpy.array(untransformed_sample))
+            return y
+        elif len(X.shape) == 3:
+            untransformed_x = []
+            for samples in X:
+                untransformed_sample = []
+                for sample in samples:
+                    untransformed_elems = []
+                    start = 0
+                    for max_index in self._max_indices_for_categorical:
+                        end = start + max_index + 1
+                        idx = numpy.argmax(sample[start:end])
+                        untransformed_elems.append(idx)
+                    untransformed_sample.append(untransformed_elems)
+                untransformed_x.append(untransformed_sample)
+            y = torch.DoubleTensor(numpy.array(untransformed_x))
+
+            return y
+        else:
+            raise ValueError(f"Unsupported tensor shape: {X.shape}.")
+
 
     def __call__(self, X):
         return self.transform(X)
@@ -77,41 +142,9 @@ class T(InputTransform):
     def to(self, X):
         pass
 
-
-class WrapperKernel(ScaleKernel):
-    def __init__(
-            self,
-            base_kernel,
-            outputscale_prior=None,
-            outputscale_constraint=None,
-            max_indices_for_categorical=[],
-            **kwargs,
-    ):
-        self._max_indices_for_categorical = max_indices_for_categorical
-        super(WrapperKernel, self).__init__(
-            base_kernel, outputscale_prior, outputscale_constraint, **kwargs
-        )
-
-    def transform(self, x: torch.Tensor):
-        transformed_x = []
-
-        x = numpy.rint(x.numpy()).astype(int)
-        for sample in x:
-            transformed_sample = []
-            for elem, max_index in zip(sample, self._max_indices_for_categorical):
-                elem = max(max_index, elem)
-                one_hot = numpy.zeros(max_index + 1)
-                one_hot[elem] = 1.
-                transformed_sample.append(one_hot)
-
-            transformed_x.append(numpy.concatenate(transformed_sample))
-        return torch.FloatTensor(numpy.array(transformed_x))
-
-    def forward(self, x1, x2, last_dim_is_batch=False, diag=False, **params):
-        x1 = self.transform(x1)
-        x2 = self.transform(x2)
-
-        return super(WrapperKernel, self).forward(x1, x2, last_dim_is_batch, diag, **params)
+    def transform_bounds(self):
+        dim = sum(self._max_indices_for_categorical) + len(self._max_indices_for_categorical)
+        return torch.DoubleTensor([[0 for _ in range(dim)], [1 for _ in range(dim)]])
 
 
 @experimental("2.4.0")
@@ -167,11 +200,12 @@ def qei_candidates_func(
 
         objective = None  # Using the default identity objective.
 
+    _input_transform = T(
+        max_indices_for_categorical, dim=len(max_indices_for_categorical)
+    )
     model = SingleTaskGP(
         train_x, train_y, outcome_transform=Standardize(m=train_y.size(-1)),
-        input_transform=T(
-            max_indices_for_categorical, dim=numpy.sum(max_indices_for_categorical) + len(max_indices_for_categorical)
-        )
+        input_transform=_input_transform
     )
 
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
@@ -186,13 +220,15 @@ def qei_candidates_func(
 
     candidates, _ = optimize_acqf(
         acq_function=acqf,
-        bounds=bounds,
+        bounds=_input_transform.transform_bounds(),
         q=1,
         num_restarts=10,
         raw_samples=512,
         options={"batch_limit": 5, "maxiter": 200},
         sequential=True,
     )
+
+    candidates = _input_transform.untransform(candidates)
 
     candidates = candidates.detach()
 
