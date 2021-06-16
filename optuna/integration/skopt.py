@@ -108,6 +108,7 @@ class SkoptSampler(BaseSampler):
         n_startup_trials: int = 1,
         *,
         consider_pruned_trials: bool = False,
+        experimental_categorical: bool = False,
     ) -> None:
 
         _imports.check()
@@ -121,6 +122,7 @@ class SkoptSampler(BaseSampler):
         self._n_startup_trials = n_startup_trials
         self._search_space = samplers.IntersectionSearchSpace()
         self._consider_pruned_trials = consider_pruned_trials
+        self._experimental_categorical = experimental_categorical
 
         if self._consider_pruned_trials:
             warnings.warn(
@@ -167,7 +169,7 @@ class SkoptSampler(BaseSampler):
         if len(complete_trials) < self._n_startup_trials:
             return {}
 
-        optimizer = _Optimizer(search_space, self._skopt_kwargs)
+        optimizer = _Optimizer(search_space, self._skopt_kwargs, self._experimental_categorical)
         optimizer.tell(study, complete_trials)
         return optimizer.ask()
 
@@ -236,7 +238,8 @@ class SkoptSampler(BaseSampler):
 
 class _Optimizer(object):
     def __init__(
-        self, search_space: Dict[str, distributions.BaseDistribution], skopt_kwargs: Dict[str, Any]
+        self, search_space: Dict[str, distributions.BaseDistribution], skopt_kwargs: Dict[str, Any],
+        experimental_categorical: bool = False
     ) -> None:
 
         self._search_space = search_space
@@ -270,7 +273,11 @@ class _Optimizer(object):
 
             dimensions.append(dimension)
 
-        self._optimizer = skopt.Optimizer(dimensions, **skopt_kwargs)
+        if experimental_categorical:
+            pass
+        else:
+            # original skopt implementation
+            self._optimizer = skopt.Optimizer(dimensions, **skopt_kwargs)
 
     def tell(self, study: Study, complete_trials: List[FrozenTrial]) -> None:
 
