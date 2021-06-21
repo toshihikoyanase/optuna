@@ -23,11 +23,13 @@ from optuna.trial import TrialState
 
 with try_import() as _imports:
     import skopt
+    from skopt.learning import GaussianProcessRegressor
+    from skopt.learning.gaussian_process.kernels import ConstantKernel
+    from skopt.learning.gaussian_process.kernels import Matern
     from skopt.space import space
     from skopt.space import Space
-    from skopt.learning import GaussianProcessRegressor
-    from skopt.learning.gaussian_process.kernels import ConstantKernel, Matern
     from skopt.utils import normalize_dimensions
+
 
 class SkoptSampler(BaseSampler):
     """Sampler using Scikit-Optimize as the backend.
@@ -241,8 +243,10 @@ class SkoptSampler(BaseSampler):
 
 class _Optimizer(object):
     def __init__(
-        self, search_space: Dict[str, distributions.BaseDistribution], skopt_kwargs: Dict[str, Any],
-        experimental_categorical: bool = False
+        self,
+        search_space: Dict[str, distributions.BaseDistribution],
+        skopt_kwargs: Dict[str, Any],
+        experimental_categorical: bool = False,
     ) -> None:
 
         self._search_space = search_space
@@ -285,14 +289,20 @@ class _Optimizer(object):
 
             cov_amplitude = ConstantKernel(1.0, (0.01, 1000.0))
             other_kernel = _WrappedMatern(
+                dimensions=_space,
                 length_scale=np.ones(n_dims),
-                length_scale_bounds=[(0.01, 100)] * n_dims, nu=2.5)
+                length_scale_bounds=[(0.01, 100)] * n_dims,
+                nu=2.5,
+            )
             base_estimator = GaussianProcessRegressor(
                 kernel=cov_amplitude * other_kernel,
-                normalize_y=True, noise="gaussian",
-                n_restarts_optimizer=2)
-            self._optimizer = skopt.Optimizer(base_estimator=base_estimator,
-                                              acq_optimizer="sampling", **skopt_kwargs)
+                normalize_y=True,
+                noise="gaussian",
+                n_restarts_optimizer=2,
+            )
+            self._optimizer = skopt.Optimizer(
+                dimensions, base_estimator=base_estimator, acq_optimizer="sampling", **skopt_kwargs
+            )
         else:
             # original skopt implementation
             self._optimizer = skopt.Optimizer(dimensions, **skopt_kwargs)
@@ -374,41 +384,37 @@ class _Optimizer(object):
 
 
 class _WrappedMatern(Matern):
-    def __init__(self, space: skopt.Space, length_scale=1.0, length_scale_bounds=(0.01, 100), nu=2.5):
-        self._space = space
+    def __init__(
+        self, dimensions: skopt.Space, length_scale=1.0, length_scale_bounds=(0.01, 100), nu=2.5
+    ):
+        self.dimensions = dimensions
         super(_WrappedMatern, self).__init__(length_scale, length_scale_bounds, nu)
 
     def _transform(self, X):
-        # we collect the positions of the categorical variables in this dict
-        categorical_group_indices = []
+        transformed_X = []
+        num_samples = len(X)
 
-        for i, skopt_space in enumerate(self._space):
+        for i, skopt_space in enumerate(self.dimensions):
             if isinstance(skopt_space, space.Integer):
                 # X[:, i] = np.floor(X[:, i])
                 tmp = X[:, i] * 4  # should be replaced depending on the dimension?
                 X[:, i] = (np.round(tmp)) / 4
-            elif isinstance(skopt_space, space.Integer):
-                categorical_group_indices.append(i)
+            elif isinstance(skopt_space, space.Categorical):
+                n_choice = len(skopt_space.categories)
+                one_hot_dims = []
+                for x in X[:, i]:
+                    # convert normalized domain to integer
+                    one_hot_dims.append(
+                        [np.where(np.arange(n_choice) / (n_choice - 1) == x)[0][0]]
+                    )
+
+                one_hot = np.zeros((num_samples, n_choice))
+                np.put_along_axis(one_hot, np.array(one_hot_dims), 1.0, axis=1)
+
+                transformed_X.append(one_hot)
             else:
-                pass  # do nothing
+                transformed_X.append(X[:, i])
 
-        # print(categorical_group_indices)
-        # set binary max for categorical groups
-        # heuristics ...
-        n_choice = 5
-        for index in categorical_group_indices:
-            one_hot_dims = []
-            for x in X[:, index]:
-                one_hot_dims.append(
-                    # unnormalize
-                    [np.where(np.arange(n_choice) / (n_choice-1) == x)[0][0]]
-                )
+        transformed_X = np.hstack(transformed_X)
 
-        one_hot = np.zeros((len(X), n_choice))
-        # print(one_hot, np.array(one_hot_dims))
-        np.put_along_axis(one_hot, np.array(one_hot_dims), 1., axis=1)
-        # print(X, one_hot, index)
-        X = np.hstack([X[:, :index], one_hot])
-
-        print("after", X)
-        return X
+        return transformed_X
