@@ -395,11 +395,8 @@ class _WrappedMatern(Matern):
         num_samples = len(X)
 
         for i, skopt_space in enumerate(self.dimensions):
-            if isinstance(skopt_space, space.Integer):
-                # X[:, i] = np.floor(X[:, i])
-                tmp = X[:, i] * 4  # should be replaced depending on the dimension?
-                X[:, i] = (np.round(tmp)) / 4
-            elif isinstance(skopt_space, space.Categorical):
+            if isinstance(skopt_space, space.Categorical):
+                # todo(nzw): implement `if isinstance(skopt_space, space.Integer)`
                 n_choice = len(skopt_space.categories)
                 one_hot_dims = []
                 for x in X[:, i]:
