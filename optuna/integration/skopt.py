@@ -391,9 +391,11 @@ class _WrappedMatern(Matern):
         super(_WrappedMatern, self).__init__(length_scale, length_scale_bounds, nu)
 
     def _transform(self, X):
+        logger = optuna.logging.get_logger(__name__)
+
         transformed_X = []
         num_samples = len(X)
-
+        logger.info("before", X.shape)
         for i, skopt_space in enumerate(self.dimensions):
             if isinstance(skopt_space, space.Categorical):
                 # todo(nzw): implement `if isinstance(skopt_space, space.Integer)`
@@ -412,6 +414,7 @@ class _WrappedMatern(Matern):
             else:
                 transformed_X.append(X[:, i])
 
-        transformed_X = np.hstack(transformed_X)
+        transformed_X = np.hstack(transformed_X).T
+        logger.info("after", transformed_X.shape)
 
         return transformed_X
