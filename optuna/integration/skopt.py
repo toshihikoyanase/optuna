@@ -414,7 +414,7 @@ class _WrappedMatern(Matern):
             else:
                 transformed_X.append(X[:, i])
 
-        transformed_X = np.hstack(transformed_X).T
+        transformed_X = np.hstack(transformed_X)
         logger.info("after", transformed_X.shape)
 
         return transformed_X
