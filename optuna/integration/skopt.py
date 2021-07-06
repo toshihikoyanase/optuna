@@ -114,6 +114,7 @@ class SkoptSampler(BaseSampler):
         *,
         consider_pruned_trials: bool = False,
         experimental_categorical: bool = False,
+        force_one_hot: bool = False,
     ) -> None:
 
         _imports.check()
@@ -128,6 +129,7 @@ class SkoptSampler(BaseSampler):
         self._search_space = samplers.IntersectionSearchSpace()
         self._consider_pruned_trials = consider_pruned_trials
         self._experimental_categorical = experimental_categorical
+        self._force_one_hot = force_one_hot
 
         if self._consider_pruned_trials:
             warnings.warn(
@@ -174,7 +176,7 @@ class SkoptSampler(BaseSampler):
         if len(complete_trials) < self._n_startup_trials:
             return {}
 
-        optimizer = _Optimizer(search_space, self._skopt_kwargs, self._experimental_categorical)
+        optimizer = _Optimizer(search_space, self._skopt_kwargs, self._experimental_categorical, self._force_one_hot)
         optimizer.tell(study, complete_trials)
         return optimizer.ask()
 
