@@ -247,6 +247,7 @@ class _Optimizer(object):
         search_space: Dict[str, distributions.BaseDistribution],
         skopt_kwargs: Dict[str, Any],
         experimental_categorical: bool = False,
+        force_one_hot: bool = False,
     ) -> None:
 
         self._search_space = search_space
@@ -288,12 +289,17 @@ class _Optimizer(object):
             n_dims = _space.transformed_n_dims
 
             cov_amplitude = ConstantKernel(1.0, (0.01, 1000.0))
-            other_kernel = _WrappedMatern(
-                dimensions=_space,
-                length_scale=np.ones(n_dims),
-                length_scale_bounds=[(0.01, 100)] * n_dims,
-                nu=2.5,
-            )
+            if not force_one_hot:
+                other_kernel = _WrappedMatern(
+                    dimensions=_space,
+                    length_scale=np.ones(n_dims),
+                    length_scale_bounds=[(0.01, 100)] * n_dims,
+                    nu=2.5,
+                )
+            else:
+                other_kernel = Matern(
+                    length_scale=np.ones(n_dims),
+                    length_scale_bounds=[(0.01, 100)] * n_dims, nu=2.5)
             base_estimator = GaussianProcessRegressor(
                 kernel=cov_amplitude * other_kernel,
                 normalize_y=True,
