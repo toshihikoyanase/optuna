@@ -16,6 +16,7 @@ import numpy as np
 
 import optuna
 from optuna._experimental import ExperimentalWarning
+from optuna._transform import _SearchSpaceTransform
 from optuna.distributions import BaseDistribution
 from optuna.samplers._base import BaseSampler
 from optuna.samplers._random import RandomSampler
@@ -132,6 +133,8 @@ class NSGAIISampler(BaseSampler):
         self._random_sampler = RandomSampler(seed=seed)
         self._rng = np.random.RandomState(seed)
         self._constraints_func = constraints_func
+        self._independent_only = False
+        self._search_space = optuna.samplers.IntersectionSearchSpace()
 
     def reseed_rng(self) -> None:
         self._random_sampler.reseed_rng()
@@ -140,7 +143,7 @@ class NSGAIISampler(BaseSampler):
     def infer_relative_search_space(
         self, study: Study, trial: FrozenTrial
     ) -> Dict[str, BaseDistribution]:
-        return {}
+        return self._search_space.calculate(study)
 
     def sample_relative(
         self,
@@ -155,19 +158,90 @@ class NSGAIISampler(BaseSampler):
         study._storage.set_trial_system_attr(trial_id, _GENERATION_KEY, generation)
 
         if parent_generation >= 0:
-            p0 = self._select_parent(study, parent_population)
-            if self._rng.rand() < self._crossover_prob:
-                p1 = self._select_parent(
-                    study, [t for t in parent_population if t._trial_id != p0._trial_id]
+            if self._independent_only:
+                p0 = self._select_parent(study, parent_population)
+                if self._rng.rand() < self._crossover_prob:
+                    p1 = self._select_parent(
+                        study, [t for t in parent_population if t._trial_id != p0._trial_id]
+                    )
+                else:
+                    p1 = p0
+
+                study._storage.set_trial_system_attr(
+                    trial_id, _PARENTS_KEY, [p0._trial_id, p1._trial_id]
                 )
             else:
-                p1 = p0
+                if len(search_space) == 0:
+                    return {}
 
-            study._storage.set_trial_system_attr(
-                trial_id, _PARENTS_KEY, [p0._trial_id, p1._trial_id]
-            )
+                parents = self.selection(study, parent_population, 2)
+                study._storage.set_trial_system_attr(
+                    trial_id, _PARENTS_KEY, [p._trial_id for p in parents]
+                )
+                trans = _SearchSpaceTransform(search_space)
+                x0 = trans.transform(parents[0].params)
+                x1 = trans.transform(parents[1].params)
+                # params = self.blx_alpha(x0, x1, 0.5)
+                params = self.sbx(x0, x1, 1)
+                external_values = trans.untransform(params)
+                return external_values
 
         return {}
+
+    def selection(self, study: Study, parent_population: List[FrozenTrial], num_parents: int) -> List[FrozenTrial]:
+        parents = []
+        for i in range(num_parents):
+            p = self._select_parent(
+                study, [t for t in parent_population if t._trial_id not in parents]
+            )
+            parents.append(p)
+        return parents
+
+    def blx_alpha(self, x1: np.ndarray, x2: np.ndarray, alpha: float) -> np.ndarray:
+        x = np.stack([x1, x2])
+        x_min = x.min(axis=0)
+        x_max = x.max(axis=0)
+        diff = alpha * (x_max - x_min) / 2
+        low = x_min - diff
+        high = x_max + diff
+        r = self._rng.uniform(0, 1, size=x1.size)
+        v = (high - low) * r + low
+        return np.clip(v, 0, 1)
+
+    def sbx(self, x1: np.ndarray, x2: np.ndarray, eta: float) -> np.ndarray:
+        # https://www.kurims.kyoto-u.ac.jp/~kyodo/kokyuroku/contents/pdf/1589-07.pdf
+        x = np.stack([x1, x2])
+        x_min = x.min(axis=0)
+        x_max = x.max(axis=0)
+        x_diff = np.clip(x_max - x_min, 1e-10, None)
+
+        beta1 = 1 + 2 * x_min / x_diff
+        beta2 = 1 + 2 * (np.ones_like(x_max) - x_max) / x_diff
+        alpha1 = 2 - np.power(beta1, -(eta + 1))
+        alpha2 = 2 - np.power(beta2, -(eta + 1))
+
+        r = self._rng.uniform(0, 1, size=x1.size)
+
+        mask1 = r > 1 / alpha1
+        betaq1 = np.power(r * alpha1, 1 / (eta + 1))
+        betaq1[mask1] = np.power((1 / (2 - r * alpha1)), 1 / (eta + 1))[mask1]
+
+        mask2 = r > 1 / alpha2
+        betaq2 = np.power(r * alpha2, 1 / (eta + 1))
+        betaq2[mask2] = np.power((1 / (2 - r * alpha2)), 1 / (eta + 1))[mask2]
+
+        c1 = 0.5 * ((x1 + x2) - betaq1*x_diff)
+        c2 = 0.5 * ((x1 + x2) - betaq2*x_diff)
+        mask = self._rng.uniform(0, 1, size=x1.size) > 0.5
+
+        if self._rng.rand() < 0.5:
+            v = x1
+            v[mask] = c1[mask]
+        else:
+            v = x2
+            v[mask] = c2[mask]
+
+        return np.clip(v, 0, 1)
 
     def sample_independent(
         self,
