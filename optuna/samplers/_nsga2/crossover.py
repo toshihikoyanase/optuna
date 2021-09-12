@@ -481,4 +481,9 @@ def _get_crossover(name: str, swapping_prob: float) -> BaseCrossover:
         return UndxM()
     if name == "spx":
         return Spx()
-    assert False, f"No such crossover: {name}"
+
+    raise ValueError(
+        f"'{name}' is not a valid crossover name."
+        "The available crossovers are \
+        `uniform (default)`, `blxalpha`, `sbx`, `vsbx`, `undx`, `undxm`, and `spx`."
+    )

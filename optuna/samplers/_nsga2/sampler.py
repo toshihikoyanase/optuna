@@ -134,12 +134,7 @@ class NSGAIISampler(BaseSampler):
                 " The interface can change in the future.",
                 ExperimentalWarning,
             )
-        if crossover not in ["uniform", "blxalpha", "sbx", "vsbx", "undx", "undxm", "spx"]:
-            raise ValueError(
-                f"'{crossover}' is not a valid crossover name."
-                "The available crossovers are \
-                `uniform (default)`, `blxalpha`, `sbx`, `vsbx`, `undx`, `undxm`, and `spx`."
-            )
+
         if crossover != "uniform":
             warnings.warn(
                 "``crossover`` option is an experimental feature."
