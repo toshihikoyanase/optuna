@@ -10,6 +10,7 @@ from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import Tuple
+from typing import Union
 import warnings
 
 import numpy as np
@@ -18,7 +19,8 @@ import optuna
 from optuna._experimental import ExperimentalWarning
 from optuna.distributions import BaseDistribution
 from optuna.samplers._base import BaseSampler
-from optuna.samplers._nsga2.crossover import crossover
+from optuna.samplers._nsga2.crossover import _get_crossover
+from optuna.samplers._nsga2.crossover import BaseCrossover
 from optuna.samplers._random import RandomSampler
 from optuna.samplers._search_space.intersection import intersection_search_space
 from optuna.study import Study
@@ -101,7 +103,7 @@ class NSGAIISampler(BaseSampler):
         *,
         population_size: int = 50,
         mutation_prob: Optional[float] = None,
-        crossover: str = "uniform",
+        crossover: Union[str, BaseCrossover] = "uniform",
         crossover_prob: float = 0.9,
         swapping_prob: float = 0.5,
         seed: Optional[int] = None,
@@ -147,7 +149,9 @@ class NSGAIISampler(BaseSampler):
 
         self._population_size = population_size
         self._mutation_prob = mutation_prob
-        self._crossover = crossover
+        self._crossover: BaseCrossover = (
+            _get_crossover(crossover, swapping_prob) if isinstance(crossover, str) else crossover
+        )
         self._crossover_prob = crossover_prob
         self._swapping_prob = swapping_prob
         self._random_sampler = RandomSampler(seed=seed)
@@ -181,8 +185,7 @@ class NSGAIISampler(BaseSampler):
         if parent_generation >= 0:
             # We choose a child based on the specified crossover method.
             if self._rng.rand() < self._crossover_prob:
-                child = crossover(
-                    self._crossover,
+                child = self._crossover.create_child(
                     study,
                     parent_population,
                     search_space,
