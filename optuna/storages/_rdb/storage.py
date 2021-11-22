@@ -1,3 +1,4 @@
+from collections import defaultdict
 from contextlib import contextmanager
 import copy
 from datetime import datetime
@@ -385,7 +386,7 @@ class RDBStorage(BaseStorage):
 
         return system_attrs
 
-    def get_all_study_summaries(self) -> List[StudySummary]:
+    def get_all_study_summaries(self, include_best_trial=True) -> List[StudySummary]:
 
         with _create_scoped_session(self.scoped_session) as session:
             summarized_trial = (
@@ -406,74 +407,86 @@ class RDBStorage(BaseStorage):
             ).select_from(orm.outerjoin(models.StudyModel, summarized_trial))
 
             study_summary = study_summary_stmt.all()
+
+            _directions = defaultdict(list)
+            for d in session.query(models.StudyDirectionModel).all():
+                _directions[d.study_id].append(d.direction)
+
+            _user_attrs = defaultdict(list)
+            for a in session.query(models.StudyUserAttributeModel).all():
+                _user_attrs[d.study_id].append(a)
+
+            _system_attrs = defaultdict(list)
+            for a in session.query(models.StudySystemAttributeModel).all():
+                _system_attrs[d.study_id].append(a)
+
             study_summaries = []
             for study in study_summary:
-                directions = [
-                    d.direction
-                    for d in models.StudyDirectionModel.where_study_id(study.study_id, session)
-                ]
-                best_trial: Optional[models.TrialModel] = None
-                try:
-                    if len(directions) > 1:
-                        raise ValueError
-                    elif directions[0] == StudyDirection.MAXIMIZE:
-                        best_trial = models.TrialModel.find_max_value_trial(
-                            study.study_id, 0, session
+                directions = _directions[study.study_id]
+                best_trial_frozen: Optional[FrozenTrial] = None
+                if include_best_trial:
+                    best_trial: Optional[models.TrialModel] = None
+                    try:
+                        if len(directions) > 1:
+                            raise ValueError
+                        elif directions[0] == StudyDirection.MAXIMIZE:
+                            best_trial = models.TrialModel.find_max_value_trial(
+                                study.study_id, 0, session
+                            )
+                        else:
+                            best_trial = models.TrialModel.find_min_value_trial(
+                                study.study_id, 0, session
+                            )
+                    except ValueError:
+                        best_trial_frozen = None
+                    if best_trial:
+                        value = models.TrialValueModel.find_by_trial_and_objective(
+                            best_trial, 0, session
                         )
-                    else:
-                        best_trial = models.TrialModel.find_min_value_trial(
-                            study.study_id, 0, session
+                        assert value
+                        params = (
+                            session.query(
+                                models.TrialParamModel.param_name,
+                                models.TrialParamModel.param_value,
+                                models.TrialParamModel.distribution_json,
+                            )
+                            .filter(models.TrialParamModel.trial_id == best_trial.trial_id)
+                            .all()
                         )
-                except ValueError:
-                    best_trial_frozen: Optional[FrozenTrial] = None
-                if best_trial:
-                    value = models.TrialValueModel.find_by_trial_and_objective(
-                        best_trial, 0, session
-                    )
-                    assert value
-                    params = (
-                        session.query(
-                            models.TrialParamModel.param_name,
-                            models.TrialParamModel.param_value,
-                            models.TrialParamModel.distribution_json,
+                        param_dict = {}
+                        param_distributions = {}
+                        for param in params:
+                            distribution = distributions.json_to_distribution(
+                                param.distribution_json
+                            )
+                            param_dict[param.param_name] = distribution.to_external_repr(
+                                param.param_value
+                            )
+                            param_distributions[param.param_name] = distribution
+                        user_attrs = models.TrialUserAttributeModel.where_trial_id(
+                            best_trial.trial_id, session
                         )
-                        .filter(models.TrialParamModel.trial_id == best_trial.trial_id)
-                        .all()
-                    )
-                    param_dict = {}
-                    param_distributions = {}
-                    for param in params:
-                        distribution = distributions.json_to_distribution(param.distribution_json)
-                        param_dict[param.param_name] = distribution.to_external_repr(
-                            param.param_value
+                        system_attrs = models.TrialSystemAttributeModel.where_trial_id(
+                            best_trial.trial_id, session
                         )
-                        param_distributions[param.param_name] = distribution
-                    user_attrs = models.TrialUserAttributeModel.where_trial_id(
-                        best_trial.trial_id, session
-                    )
-                    system_attrs = models.TrialSystemAttributeModel.where_trial_id(
-                        best_trial.trial_id, session
-                    )
-                    intermediate = models.TrialIntermediateValueModel.where_trial_id(
-                        best_trial.trial_id, session
-                    )
-                    best_trial_frozen = FrozenTrial(
-                        best_trial.number,
-                        TrialState.COMPLETE,
-                        value.value,
-                        best_trial.datetime_start,
-                        best_trial.datetime_complete,
-                        param_dict,
-                        param_distributions,
-                        {i.key: json.loads(i.value_json) for i in user_attrs},
-                        {i.key: json.loads(i.value_json) for i in system_attrs},
-                        {value.step: value.intermediate_value for value in intermediate},
-                        best_trial.trial_id,
-                    )
-                user_attrs = models.StudyUserAttributeModel.where_study_id(study.study_id, session)
-                system_attrs = models.StudySystemAttributeModel.where_study_id(
-                    study.study_id, session
-                )
+                        intermediate = models.TrialIntermediateValueModel.where_trial_id(
+                            best_trial.trial_id, session
+                        )
+                        best_trial_frozen = FrozenTrial(
+                            best_trial.number,
+                            TrialState.COMPLETE,
+                            value.value,
+                            best_trial.datetime_start,
+                            best_trial.datetime_complete,
+                            param_dict,
+                            param_distributions,
+                            {i.key: json.loads(i.value_json) for i in user_attrs},
+                            {i.key: json.loads(i.value_json) for i in system_attrs},
+                            {value.step: value.intermediate_value for value in intermediate},
+                            best_trial.trial_id,
+                        )
+                user_attrs = _user_attrs.get(study.study_id, {})
+                system_attrs = _system_attrs.get(study.study_id, {})
                 study_summaries.append(
                     StudySummary(
                         study_name=study.study_name,
