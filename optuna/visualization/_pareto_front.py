@@ -30,6 +30,7 @@ def plot_pareto_front(
     include_dominated_trials: bool = True,
     axis_order: Optional[List[int]] = None,
     constraints_func: Optional[Callable[[FrozenTrial], Sequence[float]]] = None,
+    objective_index: Optional[Sequence[int]] = None,
 ) -> "go.Figure":
     """Plot the Pareto front of a study.
 
@@ -80,6 +81,8 @@ def plot_pareto_front(
             If given, trials are classified into three categories: feasible and best, feasible but
             non-best, and infeasible. Categories are shown in different colors. Here, whether a
             trial is best (on Pareto front) or not is determined ignoring all infeasible trials.
+        objective_index:
+            A sequence of indices of objective values to plot.
 
     Returns:
         A :class:`plotly.graph_objs.Figure` object.
@@ -91,12 +94,24 @@ def plot_pareto_front(
 
     _imports.check()
 
-    n_dim = len(study.directions)
+    if objective_index is not None:
+        if axis_order is not None:
+            raise ValueError("`objective_index` and `axis_order` cannot be specified simultaneously.")
+        if len(objective_index) > len(study.directions):
+            raise ValueError("Too many objective index are specified.")
+        if max(objective_index) >= len(study.directions):
+            raise ValueError("Objective index exeeds the number of objectives.")
+        if min(objective_index) < 0:
+            raise ValueError("Objective index is supposed to be positive integer.")
+    else:
+        objective_index = list(range(len(study.directions)))
+    n_dim = len(objective_index)
+
     if n_dim not in (2, 3):
         raise ValueError("`plot_pareto_front` function only supports 2 or 3 objective studies.")
 
     if target_names is None:
-        target_names = [f"Objective {i}" for i in range(n_dim)]
+        target_names = [f"Objective {i}" for i in objective_index]
     elif len(target_names) != n_dim:
         raise ValueError(f"The length of `target_names` is supposed to be {n_dim}.")
 
@@ -130,7 +145,7 @@ def plot_pareto_front(
         infeasible_trials = []
 
     if axis_order is None:
-        axis_order = list(range(n_dim))
+        pass
     else:
         if len(axis_order) != n_dim:
             raise ValueError(
@@ -148,6 +163,11 @@ def plot_pareto_front(
                 f"Given `axis_order` {axis_order} contains invalid index {min(axis_order)} "
                 "lower than 0."
             )
+        objective_index = axis_order
+        _ordered_target_names = [target_names[i] for i in axis_order]
+        target_names = _ordered_target_names
+
+    print(target_names)
 
     def _make_scatter_object(
         trials: Sequence[FrozenTrial],
@@ -158,7 +178,7 @@ def plot_pareto_front(
         return _make_scatter_object_base(
             n_dim,
             trials,
-            axis_order,  # type: ignore
+            objective_index,  # type: ignore
             include_dominated_trials,
             hovertemplate=hovertemplate,
             infeasible=infeasible,
@@ -200,16 +220,16 @@ def plot_pareto_front(
     if n_dim == 2:
         layout = go.Layout(
             title="Pareto-front Plot",
-            xaxis_title=target_names[axis_order[0]],
-            yaxis_title=target_names[axis_order[1]],
+            xaxis_title=target_names[0],
+            yaxis_title=target_names[1],
         )
     else:
         layout = go.Layout(
             title="Pareto-front Plot",
             scene={
-                "xaxis_title": target_names[axis_order[0]],
-                "yaxis_title": target_names[axis_order[1]],
-                "zaxis_title": target_names[axis_order[2]],
+                "xaxis_title": target_names[0],
+                "yaxis_title": target_names[1],
+                "zaxis_title": target_names[2],
             },
         )
     return go.Figure(data=data, layout=layout)
@@ -238,7 +258,7 @@ def _make_json_compatible(value: Any) -> Any:
 def _make_scatter_object_base(
     n_dim: int,
     trials: Sequence[FrozenTrial],
-    axis_order: List[int],
+    objective_index: List[int],
     include_dominated_trials: bool,
     hovertemplate: str,
     infeasible: bool = False,
@@ -253,8 +273,8 @@ def _make_scatter_object_base(
     )
     if n_dim == 2:
         return go.Scatter(
-            x=[t.values[axis_order[0]] for t in trials],
-            y=[t.values[axis_order[1]] for t in trials],
+            x=[t.values[objective_index[0]] for t in trials],
+            y=[t.values[objective_index[1]] for t in trials],
             text=[_make_hovertext(t) for t in trials],
             mode="markers",
             hovertemplate=hovertemplate,
@@ -264,9 +284,9 @@ def _make_scatter_object_base(
     else:
         assert n_dim == 3
         return go.Scatter3d(
-            x=[t.values[axis_order[0]] for t in trials],
-            y=[t.values[axis_order[1]] for t in trials],
-            z=[t.values[axis_order[2]] for t in trials],
+            x=[t.values[objective_index[0]] for t in trials],
+            y=[t.values[objective_index[1]] for t in trials],
+            z=[t.values[objective_index[2]] for t in trials],
             text=[_make_hovertext(t) for t in trials],
             mode="markers",
             hovertemplate=hovertemplate,
