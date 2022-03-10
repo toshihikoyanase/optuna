@@ -966,13 +966,14 @@ class RDBStorage(BaseStorage):
 
         values: Optional[List[float]]
         if trial.values:
-            values = [0 for _ in trial.values]
-            for value_model in trial.values:
-                # value_model.value is `nullable=False``, but it happens to be `None`
-                # due to the issue of the migration script v2.4.0.a.
-                if value_model.value is None:
-                    values = None
-                values[value_model.objective] = self._lift_numerical_limit(value_model.value)
+            # value_model.value is `nullable=False``, but it happens to be `None`
+            # due to the issue of the migration script v2.4.0.a.
+            if any(value_model.value is None for value_model in trial.values):
+                values = None
+            else:
+                values = [0 for _ in trial.values]
+                for value_model in trial.values:
+                    values[value_model.objective] = self._lift_numerical_limit(value_model.value)
         else:
             values = None
 
