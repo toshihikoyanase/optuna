@@ -7,13 +7,14 @@ from optuna.storages._heartbeat import fail_stale_trials
 from optuna.storages._in_memory import InMemoryStorage
 from optuna.storages._rdb.storage import RDBStorage
 from optuna.storages._redis import RedisStorage
-
+from optuna.storages._rocksdb import RocksDBStorage
 
 __all__ = [
     "BaseStorage",
     "InMemoryStorage",
     "RDBStorage",
     "RedisStorage",
+    "RocksDBStorage",
     "_CachedStorage",
     "fail_stale_trials",
 ]
