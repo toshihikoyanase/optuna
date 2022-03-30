@@ -184,6 +184,7 @@ def upgrade() -> None:
             distribution.distribution_json = migrate_new_distribution(
                 distribution.distribution_json,
             )
+            assert False
         session.bulk_save_objects(distributions)
         session.commit()
     except SQLAlchemyError as e:
