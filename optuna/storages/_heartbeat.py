@@ -2,9 +2,11 @@ import abc
 import copy
 from threading import Event
 from threading import Thread
+from types import TracebackType
 from typing import Callable
 from typing import List
 from typing import Optional
+from typing import Type
 
 import optuna
 from optuna._experimental import experimental
@@ -71,6 +73,21 @@ class BaseHeartbeat(metaclass=abc.ABCMeta):
 
 
 class BaseHeartbeatThread:
+
+    def __init__(self, trial_id: int) -> None:
+        self._trial_id = trial_id
+
+    def __enter__(self) -> None:
+        self.start(self._trial_id)
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[Exception]],
+        exc_value: Optional[Exception],
+        traceback: Optional[TracebackType],
+    ) -> None:
+        self.join()
+
     def start(self, trial_id: int) -> None:
         raise NotImplementedError()
 
@@ -87,10 +104,11 @@ class NullHeartbeatThread(BaseHeartbeatThread):
 
 
 class HeartbeatThread(BaseHeartbeatThread):
-    def __init__(self, heartbeat: BaseHeartbeat) -> None:
+    def __init__(self, trial_id: int, heartbeat: BaseHeartbeat) -> None:
         self._heartbeat = heartbeat
         self._thread: Optional[Thread] = None
         self._stop_event: Optional[Event] = None
+        super.__init__(trial_id)
 
     def start(self, trial_id: int) -> None:
         self._stop_event = Event()
@@ -115,12 +133,12 @@ class HeartbeatThread(BaseHeartbeatThread):
                 return
 
 
-def get_heartbeat_thread(storage: BaseStorage) -> BaseHeartbeatThread:
+def get_heartbeat_thread(trial_id: int, storage: BaseStorage) -> BaseHeartbeatThread:
     if is_heartbeat_enabled(storage):
         assert isinstance(storage, BaseHeartbeat)
-        return HeartbeatThread(storage)
+        return HeartbeatThread(trial_id, storage)
     else:
-        return NullHeartbeatThread()
+        return NullHeartbeatThread(trial_id)
 
 
 @experimental("2.9.0")
