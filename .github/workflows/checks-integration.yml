@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+  pull_request: {}
   schedule:
     - cron: '0 23 * * SUN-THU'
   workflow_dispatch:
@@ -14,7 +15,6 @@ concurrency:
 
 jobs:
   checks:
-    if: (github.event_name == 'schedule' && github.repository == 'optuna/optuna') || (github.event_name != 'schedule')
     runs-on: ubuntu-latest
 
     steps:
