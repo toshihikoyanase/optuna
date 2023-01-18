@@ -349,11 +349,12 @@ class InMemoryStorage(BaseStorage):
             trial.user_attrs[key] = value
             self._set_trial(trial_id, trial)
 
-    def set_trial_system_attr(self, trial_id: int, key: str, value: Any) -> None:
+    def set_trial_system_attr(self, trial_id: int, key: str, value: Any, force: bool = False) -> None:
 
         with self._lock:
             trial = self._get_trial(trial_id)
-            self.check_trial_is_updatable(trial_id, trial.state)
+            if not force:
+                self.check_trial_is_updatable(trial_id, trial.state)
 
             trial = copy.copy(trial)
             trial.system_attrs = copy.copy(trial.system_attrs)

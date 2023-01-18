@@ -423,7 +423,7 @@ class BaseStorage(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def set_trial_system_attr(self, trial_id: int, key: str, value: Any) -> None:
+    def set_trial_system_attr(self, trial_id: int, key: str, value: Any, force: bool = False) -> None:
         """Set an optuna-internal attribute to a trial.
 
         This method overwrites any existing attribute.
@@ -435,6 +435,8 @@ class BaseStorage(abc.ABC):
                 Attribute key.
             value:
                 Attribute value. It should be JSON serializable.
+            force:
+                Force update even if the trial is already finished.
 
         Raises:
             :exc:`KeyError`:

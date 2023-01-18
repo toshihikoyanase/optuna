@@ -754,17 +754,18 @@ class RDBStorage(BaseStorage, BaseHeartbeat):
         else:
             attribute.value_json = json.dumps(value)
 
-    def set_trial_system_attr(self, trial_id: int, key: str, value: Any) -> None:
+    def set_trial_system_attr(self, trial_id: int, key: str, value: Any, force: bool = False) -> None:
 
         with _create_scoped_session(self.scoped_session, True) as session:
-            self._set_trial_system_attr_without_commit(session, trial_id, key, value)
+            self._set_trial_system_attr_without_commit(session, trial_id, key, value, force)
 
     def _set_trial_system_attr_without_commit(
-        self, session: "sqlalchemy_orm.Session", trial_id: int, key: str, value: Any
+        self, session: "sqlalchemy_orm.Session", trial_id: int, key: str, value: Any, force: bool = False
     ) -> None:
 
         trial = models.TrialModel.find_or_raise_by_id(trial_id, session)
-        self.check_trial_is_updatable(trial_id, trial.state)
+        if not force:
+            self.check_trial_is_updatable(trial_id, trial.state)
 
         attribute = models.TrialSystemAttributeModel.find_by_trial_and_key(trial, key, session)
         if attribute is None:

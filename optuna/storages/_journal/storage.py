@@ -353,11 +353,13 @@ class JournalStorage(BaseStorage):
             self._write_log(JournalOperation.SET_TRIAL_USER_ATTR, log)
             self._sync_with_backend()
 
-    def set_trial_system_attr(self, trial_id: int, key: str, value: Any) -> None:
+    def set_trial_system_attr(self, trial_id: int, key: str, value: Any, force: bool = False) -> None:
         log: Dict[str, Any] = {
             "trial_id": trial_id,
             "system_attr": {key: value},
         }
+        if force:
+            log["force"] = True
 
         with self._thread_lock:
             self._write_log(JournalOperation.SET_TRIAL_SYSTEM_ATTR, log)
@@ -394,7 +396,7 @@ class JournalStorageReplayResult:
         self._next_study_id: int = 0
         self._worker_id_to_owned_trial_id: Dict[str, int] = {}
 
-    def apply_logs(self, logs: List[Dict[str, Any]]) -> None:
+    def apply_logs(self, logs: List[Dict[str, Any]], force: bool = False) -> None:
         for log in logs:
             self.log_number_read += 1
             op = log["op_code"]
@@ -646,12 +648,14 @@ class JournalStorageReplayResult:
             }
             self._trials[trial_id] = trial
 
-    def _trial_exists_and_updatable(self, trial_id: int, log: Dict[str, Any]) -> bool:
+    def _trial_exists_and_updatable(self, trial_id: int, log: Dict[str, Any], force: bool = False) -> bool:
         if trial_id not in self._trials:
             if self._is_issued_by_this_worker(log):
                 raise KeyError(NOT_FOUND_MSG)
             return False
         elif self._trials[trial_id].state.is_finished():
+            if log.get("force", False):
+                return True
             if self._is_issued_by_this_worker(log):
                 raise RuntimeError(
                     "Trial#{} has already finished and can not be updated.".format(

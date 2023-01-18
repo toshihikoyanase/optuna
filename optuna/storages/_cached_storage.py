@@ -313,12 +313,13 @@ class _CachedStorage(BaseStorage, BaseHeartbeat):
                 cached_trial.user_attrs = attrs
         self._backend.set_trial_user_attr(trial_id, key=key, value=value)
 
-    def set_trial_system_attr(self, trial_id: int, key: str, value: Any) -> None:
+    def set_trial_system_attr(self, trial_id: int, key: str, value: Any, force: bool = False) -> None:
 
         with self._lock:
             cached_trial = self._get_cached_trial(trial_id)
             if cached_trial is not None:
-                self._check_trial_is_updatable(cached_trial)
+                if not force:
+                    self._check_trial_is_updatable(cached_trial)
                 attrs = copy.copy(cached_trial.system_attrs)
                 attrs[key] = value
                 cached_trial.system_attrs = attrs

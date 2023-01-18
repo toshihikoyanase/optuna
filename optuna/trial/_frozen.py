@@ -497,6 +497,10 @@ class FrozenTrial(BaseTrial):
         else:
             return None
 
+    @property
+    def _visible(self) -> bool:
+        return self.system_attrs.get("visible", True)
+
 
 def create_trial(
     *,

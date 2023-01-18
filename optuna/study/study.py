@@ -266,7 +266,8 @@ class Study:
         if isinstance(self._storage, _CachedStorage):
             self._storage.read_trials_from_remote_storage(self._study_id)
 
-        return self._storage.get_all_trials(self._study_id, deepcopy=deepcopy, states=states)
+        trials = self._storage.get_all_trials(self._study_id, deepcopy=deepcopy, states=states)
+        return [trial for trial in trials if trial._visible]
 
     @property
     def user_attrs(self) -> Dict[str, Any]:
@@ -1030,6 +1031,12 @@ class Study:
         else:
             assert False, "Should not reach."
 
+    def delete_trial(self, trial_number: int):
+        trial_id = self._storage.get_trial_id_from_study_id_trial_number(
+            self._study_id, trial_number,
+        )
+        self._storage.set_trial_system_attr(trial_id, "visible", False, force=True)
+
 
 @convert_positional_args(
     previous_positional_arg_names=[
@@ -1481,7 +1488,7 @@ def get_all_study_summaries(
 
     for s in frozen_studies:
 
-        all_trials = storage.get_all_trials(s._study_id)
+        all_trials = [trial for trial in storage.get_all_trials(s._study_id) if trial._visible]
         completed_trials = [t for t in all_trials if t.state == TrialState.COMPLETE]
 
         n_trials = len(all_trials)
