@@ -44,10 +44,10 @@ def _get_optimization_history_info_list(
 ) -> List[_OptimizationHistoryInfo]:
 
     _check_plot_args(study, target, target_name)
-    if isinstance(study, Study):
-        studies = [study]
-    else:
+    if isinstance(study, Sequence):
         studies = list(study)
+    else:
+        studies = [study]
 
     info_list: List[_OptimizationHistoryInfo] = []
     for study in studies:

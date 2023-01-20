@@ -1,11 +1,17 @@
+import copy
 from typing import Any
+from typing import cast
+from typing import Container
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
 
 from optuna import logging
+from optuna.study._multi_objective import _get_pareto_front_trials_by_trials
 from optuna.study._study_direction import StudyDirection
+from optuna.trial import FrozenTrial
+from optuna.trial import TrialState
 
 
 _logger = logging.get_logger(__name__)
@@ -44,6 +50,7 @@ class FrozenStudy:
         study_id: int,
         *,
         directions: Optional[Sequence[StudyDirection]] = None,
+        trials: Optional[List[FrozenTrial]] = None,
     ):
         self.study_name = study_name
         if direction is None and directions is None:
@@ -57,6 +64,7 @@ class FrozenStudy:
         self.user_attrs = user_attrs
         self.system_attrs = system_attrs
         self._study_id = study_id
+        self.trials = trials
 
     def __eq__(self, other: Any) -> bool:
 
@@ -93,3 +101,43 @@ class FrozenStudy:
     def directions(self) -> List[StudyDirection]:
 
         return self._directions
+
+    def _is_multi_objective(self) -> bool:
+
+        return len(self.directions) > 1
+
+    def get_trials(
+        self,
+        deepcopy: bool = True,
+        states: Optional[Container[TrialState]] = None,
+    ) -> List[FrozenTrial]:
+        if states:
+            _ts = [t for t in self.trials if t.state in states]
+        else:
+            _ts = self.trials
+        if deepcopy:
+            _ts = copy.deepcopy(_ts)
+        return _ts
+
+    @property
+    def best_trial(self) -> FrozenTrial:
+        directions = self.directions
+        all_trials = self.trials
+        if len(directions) > 1:
+            raise RuntimeError(
+                "Best trial can be obtained only for single-objective optimization."
+            )
+        direction = directions[0]
+
+        if direction == StudyDirection.MAXIMIZE:
+            best_trial = max(all_trials, key=lambda t: cast(float, t.value))
+        else:
+            best_trial = min(all_trials, key=lambda t: cast(float, t.value))
+
+        return best_trial
+
+    @property
+    def best_trials(self) -> List[FrozenTrial]:
+        _get_pareto_front_trials_by_trials(
+            self.trials, self.directions
+        )

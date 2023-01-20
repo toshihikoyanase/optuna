@@ -144,10 +144,10 @@ def _get_edf_info(
     target_name: str = "Objective Value",
 ) -> _EDFInfo:
 
-    if isinstance(study, Study):
-        studies = [study]
-    else:
+    if isinstance(study, Sequence):
         studies = list(study)
+    else:
+        studies = [study]
 
     _check_plot_args(studies, target, target_name)
 

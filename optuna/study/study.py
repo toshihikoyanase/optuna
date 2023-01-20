@@ -36,6 +36,7 @@ from optuna.study._optimize import _optimize
 from optuna.study._study_direction import StudyDirection
 from optuna.study._study_summary import StudySummary  # NOQA
 from optuna.study._tell import _tell_with_warning
+from optuna.study._frozen import FrozenStudy
 from optuna.trial import create_trial
 from optuna.trial import FrozenTrial
 from optuna.trial import TrialState
@@ -1030,6 +1031,16 @@ class Study:
         else:
             assert False, "Should not reach."
 
+    def snapshot(self) -> FrozenStudy:
+        return FrozenStudy(
+            direction=None,
+            study_name=self.study_name,
+            directions=self.directions,
+            user_attrs=self.user_attrs,
+            system_attrs=self.system_attrs,
+            study_id=self._study_id,
+            trials=self.trials,
+        )
 
 @convert_positional_args(
     previous_positional_arg_names=[
@@ -1419,6 +1430,30 @@ def copy_study(
 
     # Trials are deep copied on `add_trials`.
     to_study.add_trials(from_study.get_trials(deepcopy=False))
+
+
+def create_study_from_frozen_study(
+    frozen_study: FrozenStudy,
+    *,
+    study_name: Optional[str] = None,
+    storage: Optional[Union[str, storages.BaseStorage]] = None,
+    sampler: Optional["samplers.BaseSampler"] = None,
+    pruner: Optional[pruners.BasePruner] = None,
+) -> Study:
+    study = create_study(
+        storage=storage,
+        study_name=study_name,
+        directions=frozen_study.directions,
+        sampler=sampler,
+        pruner=pruner,
+    )
+    if frozen_study.trials:
+        study.add_trials(frozen_study.trials)
+    for k, v in frozen_study.user_attrs.items():
+        study.set_user_attr(k, v)
+    for k, v in frozen_study.user_attrs.items():
+        study.set_user_attr(k, v)
+    return study
 
 
 def get_all_study_summaries(

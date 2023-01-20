@@ -54,10 +54,10 @@ def _check_plot_args(
 ) -> None:
 
     studies: Sequence[Study]
-    if isinstance(study, Study):
-        studies = [study]
-    else:
+    if isinstance(study, Sequence):
         studies = study
+    else:
+        studies = [study]
 
     if target is None and any(study._is_multi_objective() for study in studies):
         raise ValueError(
