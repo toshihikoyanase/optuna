@@ -6,6 +6,7 @@ from optuna._imports import try_import
 with try_import() as _imports:
     import plotly
     from plotly import __version__ as plotly_version
+    import plotly.express as px
     import plotly.graph_objs as go
     from plotly.graph_objs import Contour
     from plotly.graph_objs import Scatter

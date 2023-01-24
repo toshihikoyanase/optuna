@@ -7,6 +7,7 @@ with try_import() as _imports:
     # TODO(ytknzw): Add specific imports.
     import matplotlib
     from matplotlib import __version__ as matplotlib_version
+    from matplotlib import dates
     from matplotlib import pyplot as plt
     from matplotlib.axes._axes import Axes
     from matplotlib.collections import LineCollection
@@ -27,6 +28,7 @@ with try_import() as _imports:
 
 __all__ = [
     "_imports",
+    "dates",
     "matplotlib",
     "matplotlib_version",
     "plt",
