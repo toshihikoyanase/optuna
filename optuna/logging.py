@@ -28,15 +28,16 @@ _lock: threading.Lock = threading.Lock()
 _default_handler: Optional[logging.Handler] = None
 
 
-def create_default_formatter() -> colorlog.ColoredFormatter:
+def create_default_formatter() -> logging.Formatter:
     """Create a default formatter of log messages.
 
     This function is not supposed to be directly accessed by library users.
     """
-    return colorlog.ColoredFormatter(
-        "%(log_color)s[%(levelname)1.1s %(asctime)s]%(reset)s %(message)s",
-        no_color=False if _color_supported() else True,
-    )
+    if _color_supported():
+        return colorlog.ColoredFormatter(
+            "%(log_color)s[%(levelname)1.1s %(asctime)s]%(reset)s %(message)s"
+        )
+    return logging.Formatter("[%(levelname)1.1s %(asctime)s] %(message)s")
 
 
 def _color_supported() -> bool:
