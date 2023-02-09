@@ -235,6 +235,7 @@ class CmaEsSampler(BaseSampler):
         use_separable_cma: bool = False,
         with_margin: bool = False,
         source_trials: Optional[List[FrozenTrial]] = None,
+        stop_if_converged: bool = False,
     ) -> None:
         self._x0 = x0
         self._sigma0 = sigma0
@@ -250,6 +251,7 @@ class CmaEsSampler(BaseSampler):
         self._use_separable_cma = use_separable_cma
         self._with_margin = with_margin
         self._source_trials = source_trials
+        self._stop_if_converged = stop_if_converged
 
         if self._restart_strategy:
             warnings.warn(
@@ -642,6 +644,17 @@ class CmaEsSampler(BaseSampler):
         values: Optional[Sequence[float]],
     ) -> None:
         self._independent_sampler.after_trial(study, trial, state, values)
+
+    def should_stop(self, study: "optuna.Study") -> bool:
+        if not self._stop_if_converged:
+            return False
+        completed_trials = self._get_trials(study)
+        optimizer, _ = self._restore_optimizer(completed_trials)
+        if optimizer is None:
+            return False
+        if self._restart_strategy and optimizer.should_stop():
+            return True
+        return False
 
 
 def _is_compatible_search_space(

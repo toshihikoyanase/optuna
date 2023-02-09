@@ -197,14 +197,14 @@ class GridSampler(BaseSampler):
         state: TrialState,
         values: Optional[Sequence[float]],
     ) -> None:
+        pass
+
+    def should_stop(self, study: Study) -> bool:
         target_grids = self._get_unvisited_grid_ids(study)
 
         if len(target_grids) == 0:
-            study.stop()
-        elif len(target_grids) == 1:
-            grid_id = study._storage.get_trial_system_attrs(trial._trial_id)["grid_id"]
-            if grid_id == target_grids[0]:
-                study.stop()
+            return True
+        return False
 
     @staticmethod
     def _check_value(param_name: str, param_value: Any) -> None:

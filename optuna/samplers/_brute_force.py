@@ -102,8 +102,16 @@ class BruteForceSampler(BaseSampler):
         state: TrialState,
         values: Optional[Sequence[float]],
     ) -> None:
+        pass
+
+    def should_stop(self, study: Study) -> bool:
+        if len(study.get_trials()) == 0:
+            return False
+
         if len(study.get_trials(deepcopy=False, states=(TrialState.WAITING,))) == 0:
-            study.stop()
+            return True
+
+        return False
 
 
 def _enumerate_candidates(param_distribution: BaseDistribution) -> Sequence[Any]:

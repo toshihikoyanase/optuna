@@ -190,6 +190,20 @@ class BaseSampler(abc.ABC):
 
         pass
 
+    def should_stop(self, study: Study) -> bool:
+        """Check if optimization loop should be stopped.
+
+        Some sort of algorithms can detect if optimization loop is converged, for example,
+        grid search is completed if all the grid cells are visisted. Return :obj:`True` if the
+        sampler should stop optimization loop.
+
+        Args:
+            study:
+                Target study object.
+        """
+
+        return False
+
     def _raise_error_if_multi_objective(self, study: Study) -> None:
         if study._is_multi_objective():
             raise ValueError(

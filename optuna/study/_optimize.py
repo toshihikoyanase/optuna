@@ -84,7 +84,7 @@ def _optimize(
 
             with ThreadPoolExecutor(max_workers=n_jobs) as executor:
                 for n_submitted_trials in itertools.count():
-                    if study._stop_flag:
+                    if study._stop_flag or study.sampler.should_stop(study):
                         break
 
                     if (
@@ -146,7 +146,7 @@ def _optimize_sequential(
         time_start = datetime.datetime.now()
 
     while True:
-        if study._stop_flag:
+        if study._stop_flag or study.sampler.should_stop(study):
             break
 
         if n_trials is not None:
