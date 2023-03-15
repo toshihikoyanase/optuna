@@ -35,7 +35,7 @@ class IntersectionSearchSpace:
 
         Args:
             trials:
-                TODO: write here
+                A list of trials.
             ordered_dict:
                 A boolean flag determining the return type.
                 If :obj:`False`, the returned object will be a :obj:`dict`.
@@ -106,7 +106,7 @@ def intersection_search_space(
 
     Args:
         trials:
-            TODO: write here
+            A list of trials.
         ordered_dict:
             A boolean flag determining the return type.
             If :obj:`False`, the returned object will be a :obj:`dict`.
