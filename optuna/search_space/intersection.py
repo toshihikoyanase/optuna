@@ -56,10 +56,10 @@ class IntersectionSearchSpace:
         if self._include_pruned:
             states_of_interest.append(optuna.trial.TrialState.PRUNED)
 
-        trials_interest = [trial for trial in trials if trial.state in states_of_interest]
+        trials_of_interest = [trial for trial in trials if trial.state in states_of_interest]
 
-        next_cursor = trials_interest[-1].number + 1 if len(trials_interest) > 0 else -1
-        for trial in reversed(trials_interest):
+        next_cursor = trials_of_interest[-1].number + 1 if len(trials_of_interest) > 0 else -1
+        for trial in reversed(trials_of_interest):
             if self._cursor > trial.number:
                 break
 
