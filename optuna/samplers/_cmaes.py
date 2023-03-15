@@ -324,7 +324,7 @@ class CmaEsSampler(BaseSampler):
         self, study: "optuna.Study", trial: "optuna.trial.FrozenTrial"
     ) -> Dict[str, BaseDistribution]:
         search_space: Dict[str, BaseDistribution] = {}
-        for name, distribution in self._search_space.calculate(study).items():
+        for name, distribution in self._search_space.calculate(study.trials).items():
             if distribution.single():
                 # `cma` cannot handle distributions that contain just a single value, so we skip
                 # them. Note that the parameter values for such distributions are sampled in

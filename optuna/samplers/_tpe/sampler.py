@@ -330,7 +330,7 @@ class TPESampler(BaseSampler):
                     search_space[name] = distribution
             return search_space
 
-        for name, distribution in self._search_space.calculate(study).items():
+        for name, distribution in self._search_space.calculate(study.trials).items():
             if distribution.single():
                 continue
             search_space[name] = distribution

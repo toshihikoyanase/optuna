@@ -521,7 +521,9 @@ class BoTorchSampler(BaseSampler):
             raise RuntimeError("BoTorchSampler cannot handle multiple studies.")
 
         search_space: Dict[str, BaseDistribution] = OrderedDict()
-        for name, distribution in self._search_space.calculate(study, ordered_dict=True).items():
+        for name, distribution in self._search_space.calculate(
+            study.trials, ordered_dict=True
+        ).items():
             if distribution.single():
                 # built-in `candidates_func` cannot handle distributions that contain just a
                 # single value, so we skip them. Note that the parameter values for such

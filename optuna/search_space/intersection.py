@@ -1,11 +1,11 @@
 from collections import OrderedDict
 import copy
 from typing import Dict
+from typing import List
 from typing import Optional
 
 import optuna
 from optuna.distributions import BaseDistribution
-from optuna.study import Study
 
 
 class IntersectionSearchSpace:
@@ -17,11 +17,6 @@ class IntersectionSearchSpace:
     neither is included in the resulting search space
     (i.e., the parameters with dynamic value ranges are excluded).
 
-    Note that an instance of this class is supposed to be used for only one study.
-    If different studies are passed to
-    :func:`~optuna.search_space.IntersectionSearchSpace.calculate`,
-    a :obj:`ValueError` is raised.
-
     Args:
         include_pruned:
             Whether pruned trials should be included in the search space.
@@ -30,17 +25,17 @@ class IntersectionSearchSpace:
     def __init__(self, include_pruned: bool = False) -> None:
         self._cursor: int = -1
         self._search_space: Optional[Dict[str, BaseDistribution]] = None
-        self._study_id: Optional[int] = None
 
         self._include_pruned = include_pruned
 
-    def calculate(self, study: Study, ordered_dict: bool = False) -> Dict[str, BaseDistribution]:
-        """Returns the intersection search space of the :class:`~optuna.study.Study`.
+    def calculate(
+        self, trials: List[optuna.trial.FrozenTrial], ordered_dict: bool = False
+    ) -> Dict[str, BaseDistribution]:
+        """Returns the intersection search space of the given trials.
 
         Args:
-            study:
-                A study with completed trials. The same study must be passed for one instance
-                of this class through its lifetime.
+            trials:
+                TODO: write here
             ordered_dict:
                 A boolean flag determining the return type.
                 If :obj:`False`, the returned object will be a :obj:`dict`.
@@ -52,14 +47,6 @@ class IntersectionSearchSpace:
 
         """
 
-        if self._study_id is None:
-            self._study_id = study._study_id
-        else:
-            # Note that the check below is meaningless when `InMemoryStorage` is used
-            # because `InMemoryStorage.create_new_study` always returns the same study ID.
-            if self._study_id != study._study_id:
-                raise ValueError("`IntersectionSearchSpace` cannot handle multiple studies.")
-
         states_of_interest = [
             optuna.trial.TrialState.COMPLETE,
             optuna.trial.TrialState.WAITING,
@@ -69,10 +56,10 @@ class IntersectionSearchSpace:
         if self._include_pruned:
             states_of_interest.append(optuna.trial.TrialState.PRUNED)
 
-        trials = study.get_trials(deepcopy=False, states=states_of_interest)
+        trials_interest = [trial for trial in trials if trial.state in states_of_interest]
 
-        next_cursor = trials[-1].number + 1 if len(trials) > 0 else -1
-        for trial in reversed(trials):
+        next_cursor = trials_interest[-1].number + 1 if len(trials_interest) > 0 else -1
+        for trial in reversed(trials_interest):
             if self._cursor > trial.number:
                 break
 
@@ -100,9 +87,11 @@ class IntersectionSearchSpace:
 
 
 def intersection_search_space(
-    study: Study, ordered_dict: bool = False, include_pruned: bool = False
+    trials: List[optuna.trial.FrozenTrial],
+    ordered_dict: bool = False,
+    include_pruned: bool = False,
 ) -> Dict[str, BaseDistribution]:
-    """Return the intersection search space of the :class:`~optuna.study.Study`.
+    """Return the intersection search space of the given trials.
 
     Intersection search space contains the intersection of parameter distributions that have been
     suggested in the completed trials of the study so far.
@@ -116,8 +105,8 @@ def intersection_search_space(
         as much as possible.
 
     Args:
-        study:
-            A study with completed trials.
+        trials:
+            TODO: write here
         ordered_dict:
             A boolean flag determining the return type.
             If :obj:`False`, the returned object will be a :obj:`dict`.
@@ -131,5 +120,5 @@ def intersection_search_space(
     """
 
     return IntersectionSearchSpace(include_pruned=include_pruned).calculate(
-        study, ordered_dict=ordered_dict
+        trials, ordered_dict=ordered_dict
     )
