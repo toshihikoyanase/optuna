@@ -162,7 +162,7 @@ class PyCmaSampler(BaseSampler):
         self, study: Study, trial: FrozenTrial
     ) -> Dict[str, BaseDistribution]:
         search_space = {}
-        for name, distribution in self._search_space.calculate(study.trials).items():
+        for name, distribution in self._search_space.calculate(study).items():
             if distribution.single():
                 # `cma` cannot handle distributions that contain just a single value, so we skip
                 # them. Note that the parameter values for such distributions are sampled in

@@ -181,7 +181,7 @@ class NSGAIISampler(BaseSampler):
         self, study: Study, trial: FrozenTrial
     ) -> Dict[str, BaseDistribution]:
         search_space: Dict[str, BaseDistribution] = {}
-        for name, distribution in self._search_space.calculate(study.trials).items():
+        for name, distribution in self._search_space.calculate(study).items():
             if distribution.single():
                 # The `untransform` method of `optuna._transform._SearchSpaceTransform`
                 # does not assume a single value,

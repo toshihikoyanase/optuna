@@ -522,7 +522,7 @@ class BoTorchSampler(BaseSampler):
 
         search_space: Dict[str, BaseDistribution] = OrderedDict()
         for name, distribution in self._search_space.calculate(
-            study.trials, ordered_dict=True
+            study, ordered_dict=True
         ).items():
             if distribution.single():
                 # built-in `candidates_func` cannot handle distributions that contain just a
