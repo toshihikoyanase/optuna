@@ -1,8 +1,7 @@
+from __future__ import annotations
+
 from collections import OrderedDict
 import copy
-from typing import Dict
-from typing import List
-from typing import Optional
 
 import optuna
 from optuna.distributions import BaseDistribution
@@ -30,12 +29,12 @@ class IntersectionSearchSpace:
 
     def __init__(self, include_pruned: bool = False) -> None:
         self._cursor: int = -1
-        self._search_space: Optional[Dict[str, BaseDistribution]] = None
-        self._study_id: Optional[int] = None
+        self._search_space: dict[str, BaseDistribution] | None = None
+        self._study_id: int | None = None
 
         self._include_pruned = include_pruned
 
-    def calculate(self, study: Study, ordered_dict: bool = False) -> Dict[str, BaseDistribution]:
+    def calculate(self, study: Study, ordered_dict: bool = False) -> dict[str, BaseDistribution]:
         """Returns the intersection search space of the :class:`~optuna.study.Study`.
 
         Args:
@@ -61,37 +60,12 @@ class IntersectionSearchSpace:
             if self._study_id != study._study_id:
                 raise ValueError("`IntersectionSearchSpace` cannot handle multiple studies.")
 
-        states_of_interest = [
-            optuna.trial.TrialState.COMPLETE,
-            optuna.trial.TrialState.WAITING,
-            optuna.trial.TrialState.RUNNING,
-        ]
-
-        if self._include_pruned:
-            states_of_interest.append(optuna.trial.TrialState.PRUNED)
-
-        trials = study.get_trials(deepcopy=False, states=states_of_interest)
-
-        next_cursor = trials[-1].number + 1 if len(trials) > 0 else -1
-        for trial in reversed(trials):
-            if self._cursor > trial.number:
-                break
-
-            if not trial.state.is_finished():
-                next_cursor = trial.number
-                continue
-
-            if self._search_space is None:
-                self._search_space = copy.copy(trial.distributions)
-                continue
-
-            self._search_space = {
-                name: distribution
-                for name, distribution in self._search_space.items()
-                if trial.distributions.get(name) == distribution
-            }
-
-        self._cursor = next_cursor
+        self._search_space, self._cursor = _calculate(
+            study.get_trials(deepcopy=False),
+            self._include_pruned,
+            self._cursor,
+            self._search_space,
+        )
         search_space = self._search_space or {}
 
         if ordered_dict:
@@ -100,11 +74,49 @@ class IntersectionSearchSpace:
         return copy.deepcopy(search_space)
 
 
+def _calculate(
+    trials: list[optuna.trial.FrozenTrial],
+    include_pruned: bool = False,
+    cursor: int = -1,
+    search_space: dict[str, BaseDistribution] | None = None,
+) -> tuple[dict[str, BaseDistribution] | None, int]:
+    states_of_interest = [
+        optuna.trial.TrialState.COMPLETE,
+        optuna.trial.TrialState.WAITING,
+        optuna.trial.TrialState.RUNNING,
+    ]
+
+    if include_pruned:
+        states_of_interest.append(optuna.trial.TrialState.PRUNED)
+
+    trials_of_interest = [trial for trial in trials if trial.state in states_of_interest]
+
+    next_cursor = trials[-1].number + 1 if len(trials) > 0 else -1
+    for trial in reversed(trials_of_interest):
+        if cursor > trial.number:
+            break
+
+        if not trial.state.is_finished():
+            next_cursor = trial.number
+            continue
+
+        if search_space is None:
+            search_space = copy.copy(trial.distributions)
+            continue
+
+        search_space = {
+            name: distribution
+            for name, distribution in search_space.items()
+            if trial.distributions.get(name) == distribution
+        }
+    return search_space, next_cursor
+
+
 def intersection_search_space(
-    trials: List[optuna.trial.FrozenTrial],
+    trials: list[optuna.trial.FrozenTrial],
     ordered_dict: bool = False,
     include_pruned: bool = False,
-) -> Dict[str, BaseDistribution]:
+) -> dict[str, BaseDistribution]:
     """Return the intersection search space of the given trials.
 
     Intersection search space contains the intersection of parameter distributions that have been
@@ -133,32 +145,7 @@ def intersection_search_space(
         A dictionary containing the parameter names and parameter's distributions.
     """
 
-    states_of_interest = [
-        optuna.trial.TrialState.COMPLETE,
-        optuna.trial.TrialState.WAITING,
-        optuna.trial.TrialState.RUNNING,
-    ]
-
-    if include_pruned:
-        states_of_interest.append(optuna.trial.TrialState.PRUNED)
-
-    trials = [trial for trial in trials if trial.state in states_of_interest]
-
-    search_space = None
-    for trial in reversed(trials):
-        if not trial.state.is_finished():
-            continue
-
-        if search_space is None:
-            search_space = copy.copy(trial.distributions)
-            continue
-
-        search_space = {
-            name: distribution
-            for name, distribution in search_space.items()
-            if trial.distributions.get(name) == distribution
-        }
-
+    search_space, _ = _calculate(trials, include_pruned)
     search_space = search_space or {}
 
     if ordered_dict:
