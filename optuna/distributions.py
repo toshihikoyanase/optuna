@@ -597,7 +597,7 @@ class CustomDistanceDistribution(BaseDistribution, Generic[Element]):
     def __hash__(self) -> int:
         return hash(
             (self.__class__,)
-            + tuple(("_elements", self._elements.tobytes()), ("_dist_func", self._dist_func))
+            + tuple([("_elements", self._elements.tobytes()), ("_dist_func", self._dist_func)])
         )
 
 
