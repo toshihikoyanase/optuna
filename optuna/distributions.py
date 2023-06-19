@@ -594,6 +594,12 @@ class CustomDistanceDistribution(BaseDistribution, Generic[Element]):
     def single(self) -> bool:
         return len(self._elements) == 1
 
+    def __hash__(self) -> int:
+        return hash(
+            (self.__class__,)
+            + tuple(("_elements", self._elements.tobytes()), ("_dist_func", self._dist_func))
+        )
+
 
 DISTRIBUTION_CLASSES = (
     IntDistribution,
