@@ -49,6 +49,7 @@ class StorageSupplier:
         self.tempfile: IO[Any] | None = None
         self.server: grpc.Server | None = None
         self.thread: threading.Thread | None = None
+        self.proxy: GrpcStorageProxy | None = None
 
     def __enter__(
         self,
@@ -100,13 +101,13 @@ class StorageSupplier:
             self.thread = threading.Thread(target=self.server.start)
             self.thread.start()
 
-            proxy = GrpcStorageProxy(host="localhost", port=port)
+            self.proxy = GrpcStorageProxy(host="localhost", port=port)
 
             # Wait until the server is ready.
             while True:
                 try:
-                    proxy.get_all_studies()
-                    return proxy
+                    self.proxy.get_all_studies()
+                    return self.proxy
                 except grpc.RpcError:
                     time.sleep(1)
                     continue
@@ -119,23 +120,25 @@ class StorageSupplier:
         if self.tempfile:
             self.tempfile.close()
 
+        if self.proxy:
+            del self.proxy._cache
+            del self.proxy._stub
+            # del self.proxy  # In my environment, no need to delete this instance.
+            self.proxy = None
+
         if self.server:
             assert self.thread is not None
-            self.server.stop(1)
+            self.server.stop(None)
             self.thread.join()
             self.server = None
             self.thread = None
 
 
 def _find_free_port() -> int:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    ports = list(range(13000, 13100))
-    import random
-    random.shuffle(ports)
-    for port in ports:
+    for port in range(13000, 13100):
         try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.bind(("localhost", port))
-            sock.close()
             return port
         except OSError:
             continue
