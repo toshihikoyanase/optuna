@@ -129,7 +129,10 @@ class StorageSupplier:
 
 def _find_free_port() -> int:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    for port in range(13000, 13100):
+    ports = list(range(13000, 13100))
+    import random
+    random.shuffle(ports)
+    for port in ports:
         try:
             sock.bind(("localhost", port))
             sock.close()
