@@ -132,6 +132,7 @@ def _find_free_port() -> int:
     for port in range(13000, 13100):
         try:
             sock.bind(("localhost", port))
+            sock.close()
             return port
         except OSError:
             continue
