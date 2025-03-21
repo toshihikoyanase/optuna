@@ -91,13 +91,16 @@ class GrpcStorageProxy(BaseStorage):
         state = self.__dict__.copy()
         del state["_stub"]
         del state["_cache"]
+        del state["_channel"]
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
         self.__dict__.update(state)
-        self._stub = api_pb2_grpc.StorageServiceStub(
-            grpc.insecure_channel(f"{self._host}:{self._port}")
-        )  # type: ignore
+        self._channel = grpc.insecure_channel(
+            f"{self._host}:{self._port}",
+            options=[("grpc.max_receive_message_length", -1)],
+        )
+        self._stub = api_pb2_grpc.StorageServiceStub(self._channel)  # type: ignore
         self._cache = GrpcClientCache(self._stub)
 
     def close(self) -> None:
