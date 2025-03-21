@@ -59,6 +59,7 @@ class GrpcStorageProxy(BaseStorage):
     Args:
         host: The hostname of the gRPC server.
         port: The port of the gRPC server.
+        timeout: The timeout for the gRPC connection in seconds.
 
     .. warning::
 
@@ -66,13 +67,22 @@ class GrpcStorageProxy(BaseStorage):
         behaviors when calling :func:`optuna.delete_study` due to non-invalidated cache.
     """
 
-    def __init__(self, *, host: str = "localhost", port: int = 13000) -> None:
-        self._stub = api_pb2_grpc.StorageServiceStub(
-            grpc.insecure_channel(
-                f"{host}:{port}",
-                options=[("grpc.max_receive_message_length", -1)],
-            )
-        )  # type: ignore
+    def __init__(self, *, host: str = "localhost", port: int = 13000, timeout: int = 900) -> None:
+        def wait_server(host: str, port: int, timeout: int) -> None:
+            try:
+                with grpc.insecure_channel(
+                    f"{host}:{port}", options=[("grpc.max_receive_message_length", -1)]
+                ) as channel:
+                    grpc.channel_ready_future(channel).result(timeout=timeout)
+            except grpc.FutureTimeoutError as e:
+                raise ConnectionError("GRPC connection timeout") from e
+
+        wait_server(host, port, timeout)
+        self._channel = grpc.insecure_channel(
+            f"{host}:{port}",
+            options=[("grpc.max_receive_message_length", -1)],
+        )
+        self._stub = api_pb2_grpc.StorageServiceStub(self._channel)  # type: ignore
         self._cache = GrpcClientCache(self._stub)
         self._host = host
         self._port = port
@@ -81,14 +91,20 @@ class GrpcStorageProxy(BaseStorage):
         state = self.__dict__.copy()
         del state["_stub"]
         del state["_cache"]
+        del state["_channel"]
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
         self.__dict__.update(state)
-        self._stub = api_pb2_grpc.StorageServiceStub(
-            grpc.insecure_channel(f"{self._host}:{self._port}")
-        )  # type: ignore
+        self._channel = grpc.insecure_channel(
+            f"{self._host}:{self._port}",
+            options=[("grpc.max_receive_message_length", -1)],
+        )
+        self._stub = api_pb2_grpc.StorageServiceStub(self._channel)  # type: ignore
         self._cache = GrpcClientCache(self._stub)
+
+    def close(self) -> None:
+        self._channel.close()
 
     def create_new_study(
         self, directions: Sequence[StudyDirection], study_name: str | None = None
