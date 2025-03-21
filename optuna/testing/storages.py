@@ -121,9 +121,7 @@ class StorageSupplier:
             self.tempfile.close()
 
         if self.proxy:
-            del self.proxy._cache
-            del self.proxy._stub
-            # del self.proxy  # In my environment, no need to delete this instance.
+            self.proxy.close()
             self.proxy = None
 
         if self.server:

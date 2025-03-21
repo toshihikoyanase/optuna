@@ -78,12 +78,11 @@ class GrpcStorageProxy(BaseStorage):
                 raise ConnectionError("GRPC connection timeout") from e
 
         wait_server(host, port, timeout)
-        self._stub = api_pb2_grpc.StorageServiceStub(
-            grpc.insecure_channel(
-                f"{host}:{port}",
-                options=[("grpc.max_receive_message_length", -1)],
-            )
-        )  # type: ignore
+        self._channel = grpc.insecure_channel(
+            f"{host}:{port}",
+            options=[("grpc.max_receive_message_length", -1)],
+        )
+        self._stub = api_pb2_grpc.StorageServiceStub(self._channel)  # type: ignore
         self._cache = GrpcClientCache(self._stub)
         self._host = host
         self._port = port
@@ -100,6 +99,9 @@ class GrpcStorageProxy(BaseStorage):
             grpc.insecure_channel(f"{self._host}:{self._port}")
         )  # type: ignore
         self._cache = GrpcClientCache(self._stub)
+
+    def close(self) -> None:
+        self._channel.close()
 
     def create_new_study(
         self, directions: Sequence[StudyDirection], study_name: str | None = None
